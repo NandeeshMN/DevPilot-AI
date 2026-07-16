@@ -60,32 +60,89 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
         setLoading(true);
         const email = user.email.toLowerCase();
 
-        // 1. Fetch Conversations
-        const convsRef = collection(db, 'users', email, 'conversations');
-        const convsSnap = await getDocs(convsRef);
-        const conversationsCount = convsSnap.size;
-
+        // 1. Fetch Conversations from new 'chats' collection and old fallback path
+        const uniqueChats = new Map<string, any>();
         let requestsTodayCount = 0;
-        const activitiesList: any[] = [];
 
-        convsSnap.forEach(doc => {
-          const data = doc.data();
-          const messages = data.messages || [];
-          
-          messages.forEach((m: any) => {
-            if (m.role === 'user') {
-              requestsTodayCount++;
+        try {
+          const chatsRef = collection(db, 'chats');
+          const qChats = query(chatsRef, where('userId', '==', email));
+          const chatsSnap = await getDocs(qChats);
+
+          for (const dDoc of chatsSnap.docs) {
+            const data = dDoc.data();
+            const chatId = dDoc.id;
+
+            // Fetch subcollection messages to count today's requests
+            try {
+              const msgsRef = collection(db, 'chats', chatId, 'messages');
+              const msgsSnap = await getDocs(msgsRef);
+              
+              const startOfToday = new Date();
+              startOfToday.setHours(0, 0, 0, 0);
+
+              msgsSnap.forEach(mDoc => {
+                const mData = mDoc.data();
+                if (mData.role === 'user') {
+                  const timestamp = mData.timestamp?.toDate ? mData.timestamp.toDate() : null;
+                  if (!timestamp || timestamp >= startOfToday) {
+                    requestsTodayCount++;
+                  }
+                }
+              });
+            } catch (errMsgs) {
+              console.warn("Failed fetching messages for dashboard count:", errMsgs);
+            }
+
+            uniqueChats.set(chatId, {
+              id: chatId,
+              title: data.title || "AI Assistant Chat",
+              updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
+              model: data.model || "gemini-3.5-flash"
+            });
+          }
+        } catch (errChats) {
+          console.warn("Failed loading from new chats:", errChats);
+        }
+
+        try {
+          const oldRef = collection(db, 'users', email, 'conversations');
+          const oldSnap = await getDocs(oldRef);
+
+          oldSnap.forEach(dDoc => {
+            if (!uniqueChats.has(dDoc.id)) {
+              const data = dDoc.data();
+              const messages = data.messages || [];
+              
+              const startOfToday = new Date();
+              startOfToday.setHours(0, 0, 0, 0);
+
+              messages.forEach((m: any) => {
+                if (m.role === 'user') {
+                  const timestamp = m.timestamp?.toDate 
+                    ? m.timestamp.toDate() 
+                    : (m.timestamp ? new Date(m.timestamp) : null);
+                  if (!timestamp || timestamp >= startOfToday) {
+                    requestsTodayCount++;
+                  }
+                }
+              });
+
+              uniqueChats.set(dDoc.id, {
+                id: dDoc.id,
+                title: data.title || "AI Assistant Chat",
+                updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
+                model: data.model || "gemini-3.5-flash"
+              });
             }
           });
+        } catch (errOld) {
+          console.warn("Failed loading from old conversations:", errOld);
+        }
 
-          activitiesList.push({
-            id: doc.id,
-            title: data.title || "AI Assistant Chat",
-            updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
-            model: data.model || "gemini-2.5-flash"
-          });
-        });
-
+        const conversationsCount = uniqueChats.size;
+        const activitiesList = Array.from(uniqueChats.values());
+        
         // Sort activities chronologically by updatedAt desc
         activitiesList.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 

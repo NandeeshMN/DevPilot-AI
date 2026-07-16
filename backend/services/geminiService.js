@@ -12,7 +12,7 @@ class GeminiService {
     
     // Initialize the official GoogleGenAI client
     this.ai = new GoogleGenAI({ apiKey });
-    this.defaultModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    this.defaultModel = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
   }
 
   /**
@@ -48,15 +48,35 @@ Always provide accurate, concise, professional, and developer-friendly responses
       parts: [{ text: message }]
     });
 
-    const response = await this.ai.models.generateContent({
-      model: this.defaultModel,
-      contents,
-      config: {
-        systemInstruction
-      }
-    });
+    const maxRetries = 3;
+    let retryDelay = 1500; // start with 1.5 seconds
 
-    return response.text;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.ai.models.generateContent({
+          model: this.defaultModel,
+          contents,
+          config: {
+            systemInstruction
+          }
+        });
+        return response.text;
+      } catch (error) {
+        const isUnavailable = error.message && (
+          error.message.includes('503') || 
+          error.message.includes('UNAVAILABLE') || 
+          error.message.includes('high demand')
+        );
+
+        if (isUnavailable && attempt < maxRetries) {
+          console.warn(`Gemini API returned 503 (high demand). Retrying attempt ${attempt + 1}/${maxRetries} in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          retryDelay *= 2; // exponential backoff
+          continue;
+        }
+        throw error;
+      }
+    }
   }
 }
 

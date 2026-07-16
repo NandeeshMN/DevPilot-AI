@@ -7,7 +7,7 @@ interface ChatContextType {
   setMessages: React.Dispatch<React.SetStateAction<UIChatMessage[]>>;
   loading: boolean;
   error: string | null;
-  sendMessage: (messageText: string) => Promise<void>;
+  sendMessage: (messageText: string, provider?: string) => Promise<void>;
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
   resetChat: () => void;
@@ -65,7 +65,7 @@ export const useInfiniteScroll = (callback: () => void) => {
     setLoading(false);
   };
 
-  const sendMessage = async (messageText: string) => {
+  const sendMessage = async (messageText: string, provider?: string) => {
     if (!messageText.trim() || loading) return;
     
     setError(null);
@@ -81,7 +81,7 @@ export const useInfiniteScroll = (callback: () => void) => {
 
     try {
       // Call backend API, passing conversationId if one has already been created
-      const response = await aiService.chat(messageText, conversationId || undefined);
+      const response = await aiService.chat(messageText, conversationId || undefined, provider);
       
       // Save the returned conversationId for subsequent messages
       if (response.conversationId) {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Database, Sparkles, Terminal, BookOpen, Copy, Check } from 'lucide-react';
+import aiService from '../../services/aiService';
 
 interface SQLData {
   sql: string;
@@ -23,12 +24,7 @@ export default function SQLAssistant() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/sql', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: nlpQuery })
-      });
-      const data = await res.json();
+      const data = await aiService.sqlAssistant(nlpQuery);
       setSqlData({
         sql: data.sql || "",
         explanation: data.explanation || "",

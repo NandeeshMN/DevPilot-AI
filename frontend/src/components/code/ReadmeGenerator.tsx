@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Sparkles, Eye, FileCode, Copy, Check } from 'lucide-react';
+import aiService from '../../services/aiService';
 
 export default function ReadmeGenerator() {
   const [projectName, setProjectName] = useState<string>("DevPilot AI Workspace");
@@ -17,12 +18,7 @@ export default function ReadmeGenerator() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/readme', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: projectName, description, features, installation })
-      });
-      const data = await res.json();
+      const data = await aiService.readmeGenerator(projectName, description, installation, features);
       setMarkdown(data.markdown || "");
     } catch (err) {
       // Local fallback markdown assembly

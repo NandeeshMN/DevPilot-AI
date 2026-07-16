@@ -19,8 +19,8 @@ class AIService {
    * @param {string} [conversationId] - Optional conversation identifier
    * @returns {Promise<ChatResponse>}
    */
-  async chat(message: string, conversationId?: string): Promise<ChatResponse> {
-    const response = await api.post<ChatResponse>('/ai/chat', { message, conversationId });
+  async chat(message: string, conversationId?: string, provider?: string): Promise<ChatResponse> {
+    const response = await api.post<ChatResponse>('/ai/chat', { message, conversationId, provider });
     return response.data;
   }
 

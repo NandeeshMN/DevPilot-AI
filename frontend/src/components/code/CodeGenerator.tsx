@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Code, Terminal, Sparkles, Copy, Download, Check } from 'lucide-react';
+import aiService from '../../services/aiService';
 
 export default function CodeGenerator() {
   const [prompt, setPrompt] = useState<string>("Create a React modal component that supports closing on Escape key press and outside clicks.");
@@ -14,12 +15,7 @@ export default function CodeGenerator() {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, language, framework })
-      });
-      const data = await res.json();
+      const data = await aiService.generateCode(prompt, language, framework);
       setGeneratedCode(data.code || "");
     } catch (err) {
       // Local fallback template generators

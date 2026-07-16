@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { BookOpen, Cpu, Sparkles, AlertCircle, Copy, Check } from 'lucide-react';
+import aiService from '../../services/aiService';
 
 interface AnalysisResult {
   explanation: string;
@@ -40,12 +41,7 @@ function findDuplicates(arr) {
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/explain', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language })
-      });
-      const data = await res.json();
+      const data = await aiService.explainCode(code, language);
       setAnalysis({
         explanation: data.explanation || "",
         timeComplexity: data.timeComplexity || "O(?)",

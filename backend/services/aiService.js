@@ -1,4 +1,6 @@
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const geminiService = require('./geminiService');
+const groqService = require('./groqService');
 
 const tips = [
   "Use AbortController to cleanly cancel outstanding API requests in React useEffect hooks.",
@@ -372,6 +374,48 @@ Distributed under the MIT License. See \`LICENSE\` for details.
    */
   getRandomTip() {
     return tips[Math.floor(Math.random() * tips.length)];
+  }
+
+  /**
+   * Orchestrates multi-model completions supporting automatic provider fallback.
+   */
+  async generateAIResponse({ provider, prompt, history = [] }) {
+    const selectedProvider = provider || 'gemini';
+
+    if (selectedProvider === 'groq') {
+      try {
+        return await groqService.generateGroqResponse(prompt, history);
+      } catch (err) {
+        console.error("Groq Llama completion failed:", err.message);
+        throw new Error("AI service temporarily unavailable");
+      }
+    }
+
+    // Default: Gemini first
+    try {
+      return await geminiService.generateResponse(prompt, history);
+    } catch (error) {
+      const isTemporaryFailure = error.message && (
+        error.message.includes('503') ||
+        error.message.includes('UNAVAILABLE') ||
+        error.message.includes('overloaded') ||
+        error.message.includes('timeout') ||
+        error.message.includes('limit') ||
+        error.message.includes('rate')
+      );
+
+      if (isTemporaryFailure) {
+        console.warn(`Gemini failed with error: "${error.message}". Automatically falling back to Groq Llama...`);
+        try {
+          return await groqService.generateGroqResponse(prompt, history);
+        } catch (groqError) {
+          console.error("Groq Llama fallback failed as well:", groqError.message);
+          throw new Error("AI service temporarily unavailable");
+        }
+      }
+      // Re-throw other unexpected errors
+      throw error;
+    }
   }
 }
 

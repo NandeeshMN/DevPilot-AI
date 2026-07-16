@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bug, Sparkles, HelpCircle, CheckSquare, Code, Copy, Check } from 'lucide-react';
+import aiService from '../../services/aiService';
 
 interface FixResult {
   rootCause: string;
@@ -30,12 +31,7 @@ const activeUsers = users.map(user => user.isActive);`);
     setLoading(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/debug', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, error: errorMsg, stackTrace })
-      });
-      const data = await res.json();
+      const data = await aiService.debugCode(code, errorMsg);
       setFixResult({
         rootCause: data.rootCause || "",
         solution: data.solution || "",

@@ -34,7 +34,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const [conversations, setConversations] = useState<any[]>([]);
   const [loadingConvs, setLoadingConvs] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>("");
-  const [engine, setEngine] = useState<string>("DevPilot Ultra");
+  const [provider, setProvider] = useState<string>("gemini");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -55,13 +55,36 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
     const fetchConversationsList = async () => {
       try {
         setLoadingConvs(true);
-        const convsRef = collection(db, 'users', email, 'conversations');
-        const q = query(convsRef, orderBy('updatedAt', 'desc'));
-        const snap = await getDocs(q);
-        const list: any[] = [];
-        snap.forEach(doc => {
-          list.push({ id: doc.id, ...doc.data() });
-        });
+        const listMap = new Map<string, any>();
+
+        // 1. Fetch conversations from new 'chats' collection group
+        try {
+          const chatsRef = collection(db, 'chats');
+          const qChats = query(chatsRef, where('userId', '==', email));
+          const snapChats = await getDocs(qChats);
+          snapChats.forEach(d => {
+            listMap.set(d.id, { id: d.id, ...d.data() });
+          });
+        } catch (errChats) {
+          console.warn("Failed fetching from new chats collection:", errChats);
+        }
+
+        // 2. Fetch conversations from old fallback collection path
+        try {
+          const oldRef = collection(db, 'users', email, 'conversations');
+          const snapOld = await getDocs(oldRef);
+          snapOld.forEach(d => {
+            if (!listMap.has(d.id)) {
+              listMap.set(d.id, { id: d.id, ...d.data() });
+            }
+          });
+        } catch (errOld) {
+          console.warn("Failed fetching from fallback conversations collection:", errOld);
+        }
+
+        const list = Array.from(listMap.values());
+        // Sort chronologically desc
+        list.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
         setConversations(list);
       } catch (err) {
         console.error("Error fetching conversations list:", err);
@@ -78,21 +101,44 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
     if (!user?.email || loading) return;
     try {
       const email = user.email.toLowerCase();
-      const docRef = doc(db, 'users', email, 'conversations', convId);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const firestoreMessages = data.messages || [];
-        
-        // Map Firestore messages to UIChatMessage format
-        const mapped = firestoreMessages.map((m: any) => ({
-          sender: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
-          text: m.content,
-          timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }));
-        
+      
+      // 1. Try to fetch messages from subcollection chats/{convId}/messages
+      const msgsRef = collection(db, 'chats', convId, 'messages');
+      const q = query(msgsRef, orderBy('timestamp', 'asc'));
+      const snapMsgs = await getDocs(q);
+
+      if (!snapMsgs.empty) {
+        const mapped = snapMsgs.docs.map(doc => {
+          const data = doc.data();
+          return {
+            sender: data.role === 'assistant' ? 'assistant' : 'user',
+            text: data.content,
+            timestamp: data.timestamp?.toDate 
+              ? data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          };
+        });
         setMessages(mapped);
         setConversationId(convId);
+      } else {
+        // 2. Fallback to old path users/{email}/conversations/{convId}
+        const docRef = doc(db, 'users', email, 'conversations', convId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const firestoreMessages = data.messages || [];
+          
+          const mapped = firestoreMessages.map((m: any) => ({
+            sender: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+            text: m.content,
+            timestamp: m.timestamp?.toDate 
+              ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+          
+          setMessages(mapped);
+          setConversationId(convId);
+        }
       }
     } catch (err) {
       console.error("Error loading conversation:", err);
@@ -117,7 +163,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
     if (!textToSend.trim() || loading) return;
 
     setInputText("");
-    await sendMessage(textToSend);
+    await sendMessage(textToSend, provider);
   };
 
   const handleCopyCode = (codeText: string, idx: number) => {
@@ -255,7 +301,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                   border: msg.sender === 'user' ? '1px solid rgba(139, 92, 246, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
                   background: msg.sender === 'user' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.01)'
                 }}>
-                  <div>{msg.text}</div>
+                  <div>{renderMarkdown(msg.text)}</div>
 
                   {/* Render Code Block if available */}
                   {msg.code && (
@@ -403,8 +449,8 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                 
                 {/* Engine Select Dropdown */}
                 <select
-                  value={engine}
-                  onChange={(e) => setEngine(e.target.value)}
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value)}
                   style={{
                     background: '#0D1322',
                     border: '1px solid rgba(255, 255, 255, 0.08)',
@@ -416,9 +462,8 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                     cursor: 'pointer'
                   }}
                 >
-                  <option>GPT-4 Turbo</option>
-                  <option>Claude 3.5 Sonnet</option>
-                  <option>DevPilot Ultra</option>
+                  <option value="gemini">Gemini Flash</option>
+                  <option value="groq">Groq Llama</option>
                 </select>
               </div>
 
@@ -441,3 +486,180 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
     </div>
   );
 }
+
+/**
+ * Custom lightweight helper parsing raw AI text to justified paragraphs, bullet points and bold lines.
+ */
+const renderMarkdown = (text: string) => {
+  if (!text) return null;
+
+  // Split text by lines
+  const paragraphs = text.split('\n');
+
+  return paragraphs.map((line, lineIdx) => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) {
+      return <div key={lineIdx} style={{ height: '8px' }} />;
+    }
+
+    // Headers
+    if (trimmedLine.startsWith('### ')) {
+      return (
+        <h4 key={lineIdx} style={{ fontSize: '15px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '12px', marginBottom: '8px' }}>
+          {parseInlineMarkdown(trimmedLine.substring(4))}
+        </h4>
+      );
+    }
+    if (trimmedLine.startsWith('## ')) {
+      return (
+        <h3 key={lineIdx} style={{ fontSize: '17px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '16px', marginBottom: '10px' }}>
+          {parseInlineMarkdown(trimmedLine.substring(3))}
+        </h3>
+      );
+    }
+    if (trimmedLine.startsWith('# ')) {
+      return (
+        <h2 key={lineIdx} style={{ fontSize: '19px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '20px', marginBottom: '12px' }}>
+          {parseInlineMarkdown(trimmedLine.substring(2))}
+        </h2>
+      );
+    }
+
+    // Blockquotes
+    if (trimmedLine.startsWith('> ')) {
+      return (
+        <blockquote key={lineIdx} style={{ borderLeft: '3px solid #8B5CF6', paddingLeft: '12px', marginLeft: '0', color: 'var(--color-text-muted)', fontStyle: 'italic', margin: '8px 0' }}>
+          {parseInlineMarkdown(trimmedLine.substring(2))}
+        </blockquote>
+      );
+    }
+
+    // Checkbox task list items: - [ ] or - [x] or - [~]
+    if (trimmedLine.startsWith('- [ ] ') || trimmedLine.startsWith('* [ ] ')) {
+      return (
+        <div key={lineIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0', paddingLeft: '8px' }}>
+          <span style={{
+            width: '14px',
+            height: '14px',
+            borderRadius: '3px',
+            border: '1.5px solid var(--color-text-dark)',
+            display: 'inline-block',
+            flexShrink: 0
+          }} />
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
+            {parseInlineMarkdown(trimmedLine.substring(6))}
+          </span>
+        </div>
+      );
+    }
+
+    if (trimmedLine.startsWith('- [x] ') || trimmedLine.startsWith('* [x] ') || trimmedLine.startsWith('- [~] ') || trimmedLine.startsWith('* [~] ')) {
+      const isProgress = trimmedLine.includes('[~]');
+      return (
+        <div key={lineIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0', paddingLeft: '8px' }}>
+          <span style={{
+            width: '14px',
+            height: '14px',
+            borderRadius: '3px',
+            border: isProgress ? '1.5px solid var(--color-primary-accent)' : '1.5px solid #10B981',
+            background: isProgress ? 'rgba(79, 140, 255, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '9px',
+            fontWeight: 'bold',
+            color: isProgress ? 'var(--color-primary-accent)' : '#10B981',
+            flexShrink: 0
+          }}>
+            {isProgress ? '~' : '✓'}
+          </span>
+          <span style={{ 
+            color: isProgress ? 'var(--color-text-muted)' : 'var(--color-text-dark)', 
+            textDecoration: isProgress ? 'none' : 'line-through',
+            fontSize: '13px' 
+          }}>
+            {parseInlineMarkdown(trimmedLine.substring(6))}
+          </span>
+        </div>
+      );
+    }
+
+    // Unordered lists
+    if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+      return (
+        <ul key={lineIdx} style={{ margin: '4px 0', paddingLeft: '20px', listStyleType: 'disc' }}>
+          <li style={{ color: 'var(--color-text-muted)' }}>
+            {parseInlineMarkdown(trimmedLine.substring(2))}
+          </li>
+        </ul>
+      );
+    }
+
+    // Ordered lists
+    const orderedListRegex = /^(\d+)\.\s(.*)/;
+    if (orderedListRegex.test(trimmedLine)) {
+      const match = trimmedLine.match(orderedListRegex);
+      if (match) {
+        return (
+          <ol key={lineIdx} style={{ margin: '4px 0', paddingLeft: '20px', listStyleType: 'decimal' }}>
+            <li style={{ color: 'var(--color-text-muted)' }}>
+              {parseInlineMarkdown(match[2])}
+            </li>
+          </ol>
+        );
+      }
+    }
+
+    // Default justified paragraph
+    return (
+      <p key={lineIdx} style={{ margin: '6px 0', color: 'var(--color-text-muted)', lineHeight: '1.6', textAlign: 'justify' }}>
+        {parseInlineMarkdown(line)}
+      </p>
+    );
+  });
+};
+
+/**
+ * Custom inline parsing utility supporting bold strings, italic segments, and inline monospace code blocks.
+ */
+const parseInlineMarkdown = (text: string) => {
+  // Regex to split by bold (**), italics (*), or inline code (`)
+  const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*)/g);
+
+  return parts.map((part, idx) => {
+    // Bold
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return (
+        <strong key={idx} style={{ color: 'var(--color-text-main)', fontWeight: '700' }}>
+          {part.substring(2, part.length - 2)}
+        </strong>
+      );
+    }
+    // Italic
+    if (part.startsWith('*') && part.endsWith('*')) {
+      return (
+        <em key={idx} style={{ color: 'var(--color-text-main)', fontStyle: 'italic' }}>
+          {part.substring(1, part.length - 1)}
+        </em>
+      );
+    }
+    // Inline code
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return (
+        <code key={idx} style={{ 
+          background: 'rgba(255, 255, 255, 0.06)', 
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '2px 6px', 
+          borderRadius: '4px', 
+          fontSize: '12px', 
+          fontFamily: 'var(--font-mono)',
+          color: '#E5E7EB'
+        }}>
+          {part.substring(1, part.length - 1)}
+        </code>
+      );
+    }
+    // Regular text
+    return part;
+  });
+};

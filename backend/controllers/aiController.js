@@ -95,60 +95,122 @@ const chat = async (req, res, next) => {
 
     // Extract authenticated user ID from Bearer JWT
     const userId = req.user.id.toLowerCase();
-    const conversationsRef = db.collection('users').doc(userId).collection('conversations');
+    const chatsRef = db.collection('chats');
 
     let conversationDoc;
     let existingMessages = [];
     let isNew = true;
     let createdAt = new Date().toISOString();
+    let title = "";
 
     if (conversationId) {
-      conversationDoc = conversationsRef.doc(conversationId);
-      const docSnap = await conversationDoc.get();
-      if (docSnap.exists) {
-        const data = docSnap.data();
-        existingMessages = data.messages || [];
-        createdAt = data.createdAt;
+      conversationDoc = chatsRef.doc(conversationId);
+      const chatDocSnap = await conversationDoc.get();
+
+      if (chatDocSnap.exists) {
+        const chatData = chatDocSnap.data();
+        title = chatData.title;
+        createdAt = chatData.createdAt;
         isNew = false;
+
+        // Fetch messages from subcollection ordered by timestamp asc
+        const messagesSnapshot = await conversationDoc
+          .collection('messages')
+          .orderBy('timestamp', 'asc')
+          .get();
+
+        existingMessages = messagesSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            role: data.role,
+            content: data.content
+          };
+        });
+      } else {
+        // Fallback: Check the old users/{userId}/conversations/{conversationId} path
+        const oldDocRef = db.collection('users').doc(userId).collection('conversations').doc(conversationId);
+        const oldDocSnap = await oldDocRef.get();
+
+        if (oldDocSnap.exists) {
+          const oldData = oldDocSnap.data();
+          title = oldData.title || "AI Chat Thread";
+          createdAt = oldData.createdAt || new Date().toISOString();
+          isNew = false;
+
+          existingMessages = (oldData.messages || []).map(msg => ({
+            role: msg.role === 'model' || msg.role === 'assistant' ? 'assistant' : 'user',
+            content: msg.content
+          }));
+
+          // Self-heal: Migrate this specific conversation on the fly to prevent future fallbacks
+          await conversationDoc.set({
+            userId,
+            title,
+            createdAt,
+            updatedAt: new Date().toISOString()
+          });
+
+          for (const [index, msg] of (oldData.messages || []).entries()) {
+            let msgTimestamp;
+            if (msg.timestamp) {
+              msgTimestamp = msg.timestamp;
+            } else {
+              const baseDate = new Date(createdAt);
+              baseDate.setSeconds(baseDate.getSeconds() + index);
+              msgTimestamp = admin.firestore.Timestamp.fromDate(baseDate);
+            }
+
+            await conversationDoc.collection('messages').add({
+              role: msg.role === 'model' || msg.role === 'assistant' ? 'assistant' : 'user',
+              content: msg.content || "",
+              model: msg.model || (msg.role === 'model' || msg.role === 'assistant' ? 'gemini' : null),
+              timestamp: msgTimestamp
+            });
+          }
+        }
       }
     }
 
-    if (isNew && !conversationDoc) {
-      conversationDoc = conversationsRef.doc();
-    }
-
-    // Call Gemini API with user message and history
-    const reply = await geminiService.generateResponse(message, existingMessages);
-
-    // Save history inside Firestore using transaction timestamps
-    const userMessage = {
-      role: 'user',
-      content: message,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    };
-
-    const assistantMessage = {
-      role: 'assistant',
-      content: reply,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    };
-
     if (isNew) {
-      // Auto generate conversation title from user first prompt (max 50 chars)
-      const title = message.trim().substring(0, 50);
+      conversationDoc = conversationId ? chatsRef.doc(conversationId) : chatsRef.doc();
+      title = message.trim().substring(0, 50);
 
       await conversationDoc.set({
+        userId,
         title,
         createdAt,
-        updatedAt: new Date().toISOString(),
-        messages: [userMessage, assistantMessage]
-      });
-    } else {
-      await conversationDoc.update({
-        messages: admin.firestore.FieldValue.arrayUnion(userMessage, assistantMessage),
         updatedAt: new Date().toISOString()
       });
     }
+
+    // Call unified AI Service wrapper supporting model fallback
+    const { provider } = req.body;
+    const reply = await aiService.generateAIResponse({
+      provider,
+      prompt: message,
+      history: existingMessages
+    });
+
+    // Save user message in messages subcollection
+    await conversationDoc.collection('messages').add({
+      role: 'user',
+      content: message,
+      model: null,
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Save assistant message in messages subcollection
+    await conversationDoc.collection('messages').add({
+      role: 'assistant',
+      content: reply,
+      model: provider || 'gemini',
+      timestamp: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update parent doc updatedAt metadata
+    await conversationDoc.update({
+      updatedAt: new Date().toISOString()
+    });
 
     // Yield structured JSON response
     return res.status(200).json({
@@ -156,7 +218,7 @@ const chat = async (req, res, next) => {
       conversationId: conversationDoc.id,
       reply,
       createdAt,
-      model: process.env.GEMINI_MODEL || 'gemini-2.5-flash'
+      model: provider === 'groq' ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : (process.env.GEMINI_MODEL || 'gemini-3.5-flash')
     });
 
   } catch (error) {
