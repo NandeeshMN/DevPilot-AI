@@ -4,6 +4,7 @@ import { getItem, setItem, removeItem } from '../utils/storage';
 export interface User {
   fullName: string;
   email: string;
+  photoURL?: string;
 }
 
 interface AuthContextType {

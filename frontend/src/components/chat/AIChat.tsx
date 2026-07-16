@@ -11,6 +11,9 @@ import {
   Bot 
 } from 'lucide-react';
 import useChat from '../../hooks/useChat';
+import { useAuthContext } from '../../context/AuthContext';
+import { db } from '../../firebase/firebase';
+import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
 
 interface AIChatProps {
   preloadedPrompt: string;
@@ -18,7 +21,18 @@ interface AIChatProps {
 }
 
 export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChatProps) {
-  const { messages, loading, sendMessage, resetChat } = useChat();
+  const { user } = useAuthContext();
+  const { 
+    messages, 
+    loading, 
+    sendMessage, 
+    resetChat, 
+    conversationId, 
+    setConversationId, 
+    setMessages 
+  } = useChat();
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loadingConvs, setLoadingConvs] = useState<boolean>(false);
   const [inputText, setInputText] = useState<string>("");
   const [engine, setEngine] = useState<string>("DevPilot Ultra");
   const [copiedId, setCopiedId] = useState<number | null>(null);
@@ -32,6 +46,58 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  // Fetch user conversations on load and update on message changes
+  useEffect(() => {
+    if (!user?.email) return;
+    const email = user.email.toLowerCase();
+
+    const fetchConversationsList = async () => {
+      try {
+        setLoadingConvs(true);
+        const convsRef = collection(db, 'users', email, 'conversations');
+        const q = query(convsRef, orderBy('updatedAt', 'desc'));
+        const snap = await getDocs(q);
+        const list: any[] = [];
+        snap.forEach(doc => {
+          list.push({ id: doc.id, ...doc.data() });
+        });
+        setConversations(list);
+      } catch (err) {
+        console.error("Error fetching conversations list:", err);
+      } finally {
+        setLoadingConvs(false);
+      }
+    };
+
+    fetchConversationsList();
+  }, [user, messages, conversationId]);
+
+  // Load a historical conversation chat thread
+  const handleSelectConversation = async (convId: string) => {
+    if (!user?.email || loading) return;
+    try {
+      const email = user.email.toLowerCase();
+      const docRef = doc(db, 'users', email, 'conversations', convId);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const firestoreMessages = data.messages || [];
+        
+        // Map Firestore messages to UIChatMessage format
+        const mapped = firestoreMessages.map((m: any) => ({
+          sender: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
+          text: m.content,
+          timestamp: m.timestamp?.toDate ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
+        
+        setMessages(mapped);
+        setConversationId(convId);
+      }
+    } catch (err) {
+      console.error("Error loading conversation:", err);
+    }
+  };
 
   // Handle preloaded prompt from Dashboard
   useEffect(() => {
@@ -83,11 +149,8 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
             <Pin size={10} /> Pinned Chats
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div className="glass" style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: '#00F2FE', borderLeft: '2px solid #00F2FE' }}>
-              Next.js 14 API Design
-            </div>
-            <div className="glass" style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-              Database Schema Optimization
+            <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
+              No pinned chats.
             </div>
           </div>
         </div>
@@ -97,12 +160,39 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
             Recent Chats
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {["Fixing Tailwind Purge CSS", "OAuth flow with Clerk", "Docker Multi-stage build"].map((chat, idx) => (
-              <div key={idx} className="glass" style={{ padding: '8px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <MessageSquare size={12} />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chat}</span>
+            {loadingConvs ? (
+              <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
+                Syncing threads...
               </div>
-            ))}
+            ) : conversations.length > 0 ? (
+              conversations.map((c) => (
+                <div 
+                  key={c.id} 
+                  onClick={() => handleSelectConversation(c.id)}
+                  className="glass" 
+                  style={{ 
+                    padding: '8px 12px', 
+                    borderRadius: '6px', 
+                    fontSize: '12px', 
+                    cursor: 'pointer', 
+                    color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none'
+                  }}
+                >
+                  <MessageSquare size={12} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.title || "AI Assistant Chat"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
+                No conversations yet.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -135,7 +225,13 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                 flexShrink: 0
               }}>
                 {msg.sender === 'user' ? (
-                  <img src="https://avatars.githubusercontent.com/u/1024025?v=4" alt="User" style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+                  user?.photoURL ? (
+                    <img src={user.photoURL} alt="User" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                  ) : (
+                    <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#fff' }}>
+                      {user?.fullName?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                  )
                 ) : (
                   <Bot size={16} color="#fff" />
                 )}
@@ -145,7 +241,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start' }}>
                   <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--color-text-main)' }}>
-                    {msg.sender === 'user' ? 'Alex Rivera' : 'DevPilot Core'}
+                    {msg.sender === 'user' ? (user?.fullName || 'User') : 'DevPilot Core'}
                   </span>
                   <span style={{ fontSize: '10px', color: 'var(--color-text-dark)' }}>{msg.timestamp}</span>
                 </div>

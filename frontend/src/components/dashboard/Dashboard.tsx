@@ -10,6 +10,9 @@ import {
   Activity,
   LucideIcon
 } from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
+import { db } from '../../firebase/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -25,7 +28,18 @@ interface ToolItem {
 }
 
 export default function Dashboard({ setActiveTab, setPreloadedPrompt }: DashboardProps) {
+  const { user } = useAuthContext();
   const [tip, setTip] = useState<string>("Use AbortController to cleanly cancel outstanding API requests in React useEffect hooks.");
+  
+  // Dashboard Metrics & Live Activities
+  const [stats, setStats] = useState({
+    workspaces: 0,
+    conversations: 0,
+    requestsToday: 0,
+    savedSnippets: 0
+  });
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   // Fetch AI Tip of the Day from Express backend
   useEffect(() => {
@@ -34,8 +48,84 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
       .then(data => {
         if (data.tip) setTip(data.tip);
       })
-      .catch(() => console.log("Backend not running or offline: using static fallback tip."));
+      .catch(() => console.log("Backend offline: using default static tip."));
   }, []);
+
+  // Fetch Dashboard Stats & Stream Log Activities from Firestore
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const fetchDashboardMetrics = async () => {
+      try {
+        setLoading(true);
+        const email = user.email.toLowerCase();
+
+        // 1. Fetch Conversations
+        const convsRef = collection(db, 'users', email, 'conversations');
+        const convsSnap = await getDocs(convsRef);
+        const conversationsCount = convsSnap.size;
+
+        let requestsTodayCount = 0;
+        const activitiesList: any[] = [];
+
+        convsSnap.forEach(doc => {
+          const data = doc.data();
+          const messages = data.messages || [];
+          
+          messages.forEach((m: any) => {
+            if (m.role === 'user') {
+              requestsTodayCount++;
+            }
+          });
+
+          activitiesList.push({
+            id: doc.id,
+            title: data.title || "AI Assistant Chat",
+            updatedAt: data.updatedAt || data.createdAt || new Date().toISOString(),
+            model: data.model || "gemini-2.5-flash"
+          });
+        });
+
+        // Sort activities chronologically by updatedAt desc
+        activitiesList.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+        // 2. Fetch Workspaces count (with collections safety)
+        let workspacesCount = 0;
+        try {
+          const workspacesRef = collection(db, 'users', email, 'workspaces');
+          const workspacesSnap = await getDocs(workspacesRef);
+          workspacesCount = workspacesSnap.size;
+        } catch {
+          // Silent catch if workspaces collection is empty/missing
+        }
+
+        // 3. Fetch Saved Snippets count
+        let snippetsCount = 0;
+        try {
+          const snippetsRef = collection(db, 'users', email, 'snippets');
+          const snippetsSnap = await getDocs(snippetsRef);
+          snippetsCount = snippetsSnap.size;
+        } catch {
+          // Silent catch if snippets collection is empty/missing
+        }
+
+        setStats({
+          workspaces: workspacesCount,
+          conversations: conversationsCount,
+          requestsToday: requestsTodayCount,
+          savedSnippets: snippetsCount
+        });
+
+        setRecentActivities(activitiesList.slice(0, 3));
+      } catch (err) {
+        console.error("Failed loading dashboard metrics from Firestore:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardMetrics();
+  }, [user]);
 
   const tools: ToolItem[] = [
     { id: 'chat', title: 'AI Chat', desc: 'Direct sync with Core Intelligence.', icon: MessageSquare, color: '#06B6D4' },
@@ -79,7 +169,7 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
             System Online 👋
           </h2>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: '1.6', maxWidth: '580px', marginBottom: '24px' }}>
-            Neural link established. Your last session optimized the JWT middleware schemas. All compilers online and ready for commands.
+            Neural link established. Access artificial intelligence code boards, explain logical complexities, resolve compilation trace errors, and manage software projects.
           </p>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button onClick={() => setActiveTab('chat')} className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>
@@ -91,7 +181,25 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
           </div>
         </div>
 
-        {/* Stats Grid Removed */}
+        {/* Stats Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>Active Workspaces</div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#06B6D4' }}>{stats.workspaces}</div>
+          </div>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>AI Conversations</div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#8B5CF6' }}>{stats.conversations}</div>
+          </div>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>AI Requests Today</div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#EF4444' }}>{stats.requestsToday}</div>
+          </div>
+          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>Saved Snippets</div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color: '#10B981' }}>{stats.savedSnippets}</div>
+          </div>
+        </div>
 
         {/* Quick Tools Grid */}
         <div>
@@ -159,19 +267,19 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
             <span style={{ fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px' }}>Node Directive</span>
           </div>
           <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', lineHeight: '1.6', fontStyle: 'italic' }}>
-            "Utilize the @context hook to bridge local workspace files. This ensures high-fidelity architectural alignment across the codebase."
+            "Bridge custom workspace files using active AI modules. This ensures high-fidelity architectural alignment across code boards."
           </p>
           <div style={{ marginTop: '12px', fontSize: '10px', color: 'var(--color-text-dark)' }}>
-            42 Devs synced this hook today
+            System ready for integration
           </div>
         </div>
 
         {/* Quote of the day */}
         <div className="glass-card" style={{ padding: '20px', borderLeft: '3px solid #8B5CF6' }}>
           <p style={{ fontSize: '12.5px', color: 'var(--color-text-muted)', lineHeight: '1.6', fontStyle: 'italic', marginBottom: '8px' }}>
-            "Code is for humans to read, and only incidentally for machines to execute."
+            "Simplicity is the soul of efficiency."
           </p>
-          <span style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: '700' }}>— Harold Abelson</span>
+          <span style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: '700' }}>— Austin Freeman</span>
         </div>
 
         {/* Live Active Stream Timeline */}
@@ -181,20 +289,30 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
             <span style={{ fontSize: '13px', fontWeight: '700' }}>Active Streams</span>
           </div>
           
-          <div className="timeline">
-            <div className="timeline-item">
-              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>React Auth Protocol</div>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '2px' }}>Updated 2 hours ago • Firebase Node</div>
+          {loading ? (
+            <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
+              Loading activities...
             </div>
-            <div className="timeline-item">
-              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-dark)', marginTop: '2px' }}>Trace Fix Applied</div>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '2px' }}>Resolved race condition in state loader • 5h ago</div>
+          ) : recentActivities.length > 0 ? (
+            <div className="timeline">
+              {recentActivities.map((act, idx) => (
+                <div key={idx} className="timeline-item" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('chat')}>
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {act.title}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '2px' }}>
+                    Updated {new Date(act.updatedAt).toLocaleDateString()} • {act.model}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="timeline-item">
-              <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-main)' }}>Docker Configuration</div>
-              <div style={{ fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '2px' }}>Synthesized multi-stage YAML file • Yesterday</div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '20px 10px', color: 'var(--color-text-dark)' }}>
+              <div style={{ fontSize: '24px', marginBottom: '8px' }}>📭</div>
+              <div style={{ fontSize: '12.5px', fontWeight: '600', color: 'var(--color-text-muted)' }}>No recent activity.</div>
+              <div style={{ fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '4px' }}>Start your first AI conversation.</div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* AI Tip of the Day */}

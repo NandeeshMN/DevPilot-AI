@@ -32,12 +32,14 @@ const register = async (req, res, next) => {
       fullName,
       email: email.toLowerCase(),
       password: hashedPassword,
+      photoURL: "",
+      bio: "",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     
     // Save to Firestore
-    await db.collection('users').add(newUser);
+    await db.collection('users').doc(email.toLowerCase()).set(newUser);
 
     const token = generateToken(email.toLowerCase());
 

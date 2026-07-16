@@ -1,232 +1,513 @@
-import React, { useState } from 'react';
-import { User, Bell, Shield, Key, Eye, EyeOff, Save, Check } from 'lucide-react';
-import Github from '../../components/common/GithubIcon';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  User as UserIcon, 
+  Camera, 
+  Check, 
+  Edit2, 
+  Mail, 
+  Calendar, 
+  Clock, 
+  Activity
+} from 'lucide-react';
+import { useAuthContext } from '../../context/AuthContext';
+import userService from '../../services/userService';
+import { storage } from '../../firebase/firebase';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 interface ProfileSettingsState {
   username: string;
   email: string;
-  emailNotify: boolean;
-  weeklyAlerts: boolean;
-  telemetry: boolean;
+  bio: string;
+  photoURL: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export default function Profile() {
-  const [showApiKey, setShowApiKey] = useState<boolean>(false);
-  const [saved, setSaved] = useState<boolean>(false);
-  const [apiKey] = useState<string>("sk_devpilot_4f8cff8b5cf6ec489910b981");
+const skeletonStyle = {
+  background: 'rgba(255, 255, 255, 0.04)',
+  borderRadius: '4px',
+  animation: 'pulse 1.8s infinite ease-in-out'
+};
 
+const ProfileSkeleton = () => (
+  <div className="glass-card animate-fade-in" style={{ maxWidth: '640px', width: '100%', padding: '36px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '16px' }}>
+      <div style={{ ...skeletonStyle, width: '20px', height: '20px' }}></div>
+      <div style={{ ...skeletonStyle, width: '150px', height: '20px' }}></div>
+    </div>
+    
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
+      <div style={{ ...skeletonStyle, width: '120px', height: '120px', borderRadius: '50%' }}></div>
+      <div style={{ ...skeletonStyle, width: '140px', height: '18px', marginTop: '16px' }}></div>
+      <div style={{ ...skeletonStyle, width: '100px', height: '14px', marginTop: '8px' }}></div>
+    </div>
+    
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px' }}>
+      <div style={{ ...skeletonStyle, width: '100%', height: '40px', borderRadius: '6px' }}></div>
+      <div style={{ ...skeletonStyle, width: '100%', height: '40px', borderRadius: '6px' }}></div>
+      <div style={{ ...skeletonStyle, width: '100%', height: '80px', borderRadius: '6px' }}></div>
+    </div>
+  </div>
+);
+
+export default function Profile() {
+  const { user, loginUser } = useAuthContext();
+  
+  // View & Edit Mode States
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [loadingProfile, setLoadingProfile] = useState<boolean>(true);
+  const [saving, setSaving] = useState<boolean>(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // States for Display View Mode & Inputs Edit Mode
   const [settings, setSettings] = useState<ProfileSettingsState>({
-    username: "Alex Rivera",
-    email: "alex.rivera@github.com",
-    emailNotify: true,
-    weeklyAlerts: true,
-    telemetry: false
+    username: "",
+    email: "",
+    bio: "",
+    photoURL: "",
+    createdAt: "",
+    updatedAt: ""
   });
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const [editSettings, setEditSettings] = useState<ProfileSettingsState>({
+    username: "",
+    email: "",
+    bio: "",
+    photoURL: ""
+  });
+
+  // Local state for profile picture preview in Edit Mode
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Fetch details from backend profile service
+  useEffect(() => {
+    if (!user?.email) return;
+
+    const fetchUserProfile = async () => {
+      try {
+        setLoadingProfile(true);
+        const data = await userService.getProfile();
+        
+        if (data.success && data.user) {
+          const loadedData = {
+            username: data.user.fullName,
+            email: data.user.email,
+            bio: data.user.bio || "",
+            photoURL: data.user.photoURL || "",
+            createdAt: data.user.createdAt || "",
+            updatedAt: data.user.updatedAt || ""
+          };
+          setSettings(loadedData);
+          setEditSettings(loadedData);
+        }
+      } catch (err) {
+        console.error("Error fetching profile via backend:", err);
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, [user]);
+
+  // Handle image upload selection
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) {
+        alert("Please upload an image smaller than 1MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Str = reader.result as string;
+        setSelectedImage(base64Str);
+        setEditSettings(prev => ({
+          ...prev,
+          photoURL: base64Str // preview image
+        }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-      
-      {/* Left Column: Account Details */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-        
-        {/* Profile Card */}
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', color: 'var(--color-text-main)' }}>
-            <User size={16} color="#00F2FE" />
-            <h3 style={{ fontSize: '14px', fontWeight: '700' }}>Developer Profile</h3>
-          </div>
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>Full Name</label>
-              <input
-                type="text"
-                value={settings.username}
-                onChange={(e) => setSettings({ ...settings, username: e.target.value })}
-                style={{
-                  width: '100%',
-                  background: '#050811',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  color: 'var(--color-text-main)',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '11px', color: 'var(--color-text-muted)', display: 'block', marginBottom: '4px' }}>Email Address</label>
-              <input
-                type="email"
-                value={settings.email}
-                onChange={(e) => setSettings({ ...settings, email: e.target.value })}
-                style={{
-                  width: '100%',
-                  background: '#050811',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: '6px',
-                  padding: '8px 12px',
-                  color: 'var(--color-text-main)',
-                  fontSize: '13px',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          </div>
-        </div>
+  // Discard changes & close edit mode
+  const handleCancel = () => {
+    setSelectedImage(null);
+    setEditSettings({ ...settings });
+    setIsEditMode(false);
+  };
 
-        {/* GitHub Linkage */}
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', color: 'var(--color-text-main)' }}>
-            <Github size={16} color="#8B5CF6" />
-            <h3 style={{ fontSize: '14px', fontWeight: '700' }}>GitHub Integration</h3>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255, 255, 255, 0.02)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <img src="https://avatars.githubusercontent.com/u/1024025?v=4" alt="GitHub User" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-              <div>
-                <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)', fontWeight: '600' }}>alex-rivera-dev</div>
-                <span style={{ fontSize: '10px', color: '#10B981', display: 'flex', alignItems: 'center', gap: '2px' }}>✓ Synced Securely</span>
-              </div>
-            </div>
-            <button className="btn btn-secondary" style={{ padding: '6px 12px', fontSize: '11px' }}>
-              Disconnect
-            </button>
-          </div>
-        </div>
+  // Submit and update document details via backend update profile service
+  const handleSave = async () => {
+    if (!user?.email || saving) return;
+    setSaving(true);
+    setSaveStatus('saving');
 
-        {/* Notification Swaps */}
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', color: 'var(--color-text-main)' }}>
-            <Bell size={16} color="#4F8CFF" />
-            <h3 style={{ fontSize: '14px', fontWeight: '700' }}>Workspace Alert Triggers</h3>
-          </div>
+    try {
+      const email = user.email.toLowerCase();
+      let finalPhotoURL = settings.photoURL;
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)' }}>Email Summaries</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-dark)' }}>Receive monthly diagnostics statistics.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.emailNotify}
-                onChange={(e) => setSettings({ ...settings, emailNotify: e.target.checked })}
-                style={{ cursor: 'pointer' }}
-              />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '10px' }}>
-              <div>
-                <div style={{ fontSize: '12.5px', color: 'var(--color-text-main)' }}>System Usage Alerts</div>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-dark)' }}>Notify when Monthly quota hits 80%.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.weeklyAlerts}
-                onChange={(e) => setSettings({ ...settings, weeklyAlerts: e.target.checked })}
-                style={{ cursor: 'pointer' }}
-              />
-            </div>
-          </div>
-        </div>
+      // If a new photo was selected, upload it to Firebase Storage
+      if (selectedImage) {
+        try {
+          const storageRef = ref(storage, `profiles/${email}/avatar`);
+          await uploadString(storageRef, selectedImage, 'data_url');
+          finalPhotoURL = await getDownloadURL(storageRef);
+        } catch (storageErr) {
+          console.error("Firebase Storage Upload failed, falling back to Base64:", storageErr);
+          // Fallback to storing Base64 string directly if storage is blocked
+          finalPhotoURL = selectedImage;
+        }
+      }
 
+      const res = await userService.updateProfile(
+        editSettings.username,
+        editSettings.bio,
+        finalPhotoURL
+      );
+
+      if (res.success && res.user) {
+        // Update auth context state to propagate custom picture
+        if (loginUser) {
+          loginUser(
+            { fullName: res.user.fullName, email: res.user.email, photoURL: res.user.photoURL },
+            localStorage.getItem('auth_token') || ""
+          );
+        }
+
+        setSettings({
+          username: res.user.fullName,
+          email: res.user.email,
+          bio: res.user.bio || "",
+          photoURL: res.user.photoURL || "",
+          updatedAt: res.user.updatedAt || new Date().toISOString(),
+          createdAt: settings.createdAt // retain original
+        });
+
+        setSelectedImage(null);
+        setSaveStatus('success');
+
+        // Auto-return to View Mode after successful save animation delay
+        setTimeout(() => {
+          setIsEditMode(false);
+          setSaveStatus('idle');
+          setSaving(false);
+        }, 1500);
+      } else {
+        throw new Error("Backend save failed");
+      }
+
+    } catch (err) {
+      console.error("Error updating user profile details:", err);
+      alert("Failed to update profile. Server or Storage error.");
+      setSaveStatus('idle');
+      setSaving(false);
+    }
+  };
+
+  // Render Skeleton Loader while loading
+  if (loadingProfile) {
+    return (
+      <div className="animate-fade-in" style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+        <ProfileSkeleton />
       </div>
+    );
+  }
 
-      {/* Right Column: Security API Keys & Billing Mockups */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+  return (
+    <div className="animate-fade-in" style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+      <div className="glass-card" style={{ maxWidth: '640px', width: '100%', padding: '36px' }}>
         
-        {/* API Credentials */}
-        <div className="glass-card" style={{ padding: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px', color: 'var(--color-text-main)' }}>
-            <Shield size={16} color="#EF4444" />
-            <h3 style={{ fontSize: '14px', fontWeight: '700' }}>API Credentials</h3>
+        {/* Header Section */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--color-text-main)' }}>
+            <UserIcon size={20} color="#00F2FE" />
+            <h2 style={{ fontSize: '18px', fontWeight: '800', letterSpacing: '0.5px' }}>
+              {isEditMode ? "Edit Profile Settings" : "Profile Overview"}
+            </h2>
           </div>
+          {!isEditMode && (
+            <button 
+              onClick={() => setIsEditMode(true)}
+              className="btn btn-secondary"
+              style={{ padding: '6px 14px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Edit2 size={12} /> Edit Profile
+            </button>
+          )}
+        </div>
 
-          <p style={{ fontSize: '11.5px', color: 'var(--color-text-muted)', lineHeight: '1.5', marginBottom: '16px' }}>
-            Use this developer credential key to query DevPilot AI models directly from your IDE extensions or build scripts. Keep this secret.
-          </p>
+        {/* PROFILE VIEW MODE */}
+        {!isEditMode ? (
+          <div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
+              {/* Circular Avatar */}
+              <div style={{
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                background: '#0D1322',
+                border: '2px solid #8B5CF6',
+                overflow: 'hidden',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)',
+                marginBottom: '16px'
+              }}>
+                {settings.photoURL ? (
+                  <img 
+                    src={settings.photoURL} 
+                    alt="Profile Avatar" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <UserIcon size={48} color="var(--color-text-dark)" />
+                )}
+              </div>
 
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <div style={{
-              flexGrow: 1,
-              background: '#050811',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              borderRadius: '6px',
-              padding: '8px 12px',
-              fontSize: '12.5px',
-              fontFamily: 'var(--font-mono)',
-              color: showApiKey ? 'var(--color-text-main)' : 'var(--color-text-dark)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <span>{showApiKey ? apiKey : "sk_devpilot_••••••••••••••••••••"}</span>
-              <button 
-                onClick={() => setShowApiKey(!showApiKey)}
-                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}
+              <h3 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--color-text-main)', marginBottom: '6px' }}>
+                {settings.username}
+              </h3>
+              
+              <span style={{
+                background: 'rgba(16, 185, 129, 0.1)',
+                color: '#10B981',
+                fontSize: '11px',
+                padding: '2px 10px',
+                borderRadius: '12px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontWeight: '600'
+              }}>
+                <Activity size={10} /> Active / Online
+              </span>
+            </div>
+
+            {/* View Details Box */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '24px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Mail size={16} color="var(--color-text-muted)" />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-dark)', fontWeight: '600' }}>Email Address</span>
+                  <span style={{ fontSize: '13.5px', color: 'var(--color-text-main)' }}>{settings.email}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                <UserIcon size={16} color="var(--color-text-muted)" style={{ marginTop: '2px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--color-text-dark)', fontWeight: '600' }}>Short Bio</span>
+                  <p style={{ fontSize: '13.5px', color: 'var(--color-text-muted)', lineHeight: '1.6', margin: 0 }}>
+                    {settings.bio || "No bio added yet."}
+                  </p>
+                </div>
+              </div>
+
+              {/* Timestamp Meta */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.05)', paddingTop: '20px', marginTop: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Calendar size={14} color="var(--color-text-dark)" />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-dark)' }}>Member Since</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                      {settings.createdAt ? new Date(settings.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <Clock size={14} color="var(--color-text-dark)" />
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--color-text-dark)' }}>Last Updated</span>
+                    <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                      {settings.updatedAt ? new Date(settings.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* EDIT MODE FORM */
+          <div>
+            {/* Uploader circular image */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '32px' }}>
+              <div 
+                onClick={triggerFileInput}
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  borderRadius: '50%',
+                  background: '#0D1322',
+                  border: '2px solid #8B5CF6',
+                  position: 'relative',
+                  cursor: 'pointer',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)'
+                }}
               >
-                {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                {editSettings.photoURL ? (
+                  <img 
+                    src={editSettings.photoURL} 
+                    alt="Upload Preview" 
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                  />
+                ) : (
+                  <UserIcon size={48} color="var(--color-text-dark)" />
+                )}
+
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'rgba(4, 7, 17, 0.6)',
+                  opacity: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'opacity 0.2s ease',
+                  color: '#fff'
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                onMouseLeave={e => e.currentTarget.style.opacity = '0'}
+                >
+                  <Camera size={20} />
+                </div>
+              </div>
+
+              <button 
+                onClick={triggerFileInput}
+                className="btn btn-secondary" 
+                style={{ marginTop: '16px', padding: '6px 14px', fontSize: '12px', gap: '6px' }}
+              >
+                <Camera size={14} /> Change Photo
+              </button>
+              
+              <input 
+                type="file"
+                ref={fileInputRef}
+                onChange={handlePhotoUpload}
+                accept="image/*"
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {/* Input fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginBottom: '32px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={editSettings.username}
+                  onChange={(e) => setEditSettings({ ...editSettings, username: e.target.value })}
+                  placeholder="Enter full name"
+                  style={{
+                    width: '100%',
+                    background: '#050811',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: 'var(--color-text-main)',
+                    fontSize: '13.5px',
+                    outline: 'none',
+                    transition: 'border 0.2s',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#8B5CF6'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={editSettings.email}
+                  readOnly
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.04)',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: 'var(--color-text-dark)',
+                    fontSize: '13.5px',
+                    outline: 'none',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
+                  Short Bio
+                </label>
+                <textarea
+                  value={editSettings.bio}
+                  onChange={(e) => setEditSettings({ ...editSettings, bio: e.target.value })}
+                  placeholder="Tell us about yourself, your tech stack, or projects you are working on..."
+                  style={{
+                    width: '100%',
+                    background: '#050811',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: 'var(--color-text-main)',
+                    fontSize: '13.5px',
+                    outline: 'none',
+                    resize: 'none',
+                    minHeight: '100px',
+                    transition: 'border 0.2s',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#8B5CF6'}
+                  onBlur={e => e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)'}
+                />
+              </div>
+            </div>
+
+            {/* Control buttons with Save Status */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={handleCancel}
+                className="btn btn-secondary"
+                style={{ flex: 1, padding: '12px' }}
+                disabled={saving}
+              >
+                Cancel
+              </button>
+              
+              <button 
+                onClick={handleSave}
+                className="btn btn-gradient"
+                style={{ flex: 1, padding: '12px', background: 'var(--button-gradient)', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                disabled={saving}
+              >
+                {saveStatus === 'saving' && (
+                  <span style={{ fontSize: '13px' }}>Saving...</span>
+                )}
+                {saveStatus === 'success' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Check size={14} /> Profile Updated Successfully</span>
+                )}
+                {saveStatus === 'idle' && (
+                  <span>Save Changes</span>
+                )}
               </button>
             </div>
-            <button className="btn btn-secondary" style={{ padding: '8px', display: 'flex', alignItems: 'center' }}>
-              <Key size={14} />
-            </button>
           </div>
-        </div>
-
-        {/* Subscription Plan Tier */}
-        <div className="glass-card" style={{
-          padding: '24px',
-          background: 'linear-gradient(135deg, rgba(26, 35, 51, 0.4) 0%, rgba(139, 92, 246, 0.05) 100%)',
-          border: '1px solid rgba(139, 92, 246, 0.15)'
-        }}>
-          <span style={{
-            fontSize: '10px',
-            fontWeight: '800',
-            color: '#8B5CF6',
-            background: 'rgba(139, 92, 246, 0.1)',
-            padding: '4px 8px',
-            borderRadius: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px'
-          }}>
-            Current Plan
-          </span>
-
-          <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '12px' }}>
-            Pro Developer Account
-          </h3>
-          <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px', marginBottom: '20px' }}>
-            $29/mo • Renews on August 1st, 2026.
-          </p>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '14px', marginBottom: '20px' }}>
-            {["Unlimited code explanations", "10,000 code generation streams / mo", "Access to Claude 3.5 Sonnet & GPT-4 models"].map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--color-text-muted)' }}>
-                <span style={{ color: '#8B5CF6' }}>✓</span> {item}
-              </div>
-            ))}
-          </div>
-
-          <button className="btn btn-primary" style={{ width: '100%', fontSize: '12px', background: 'var(--brand-gradient)' }}>
-            Upgrade to Corporate Plan ($99/mo)
-          </button>
-        </div>
-
-        <button 
-          onClick={handleSave}
-          className="btn btn-gradient"
-          style={{ width: '100%', gap: '8px', padding: '12px', background: 'var(--button-gradient)' }}
-        >
-          {saved ? <Check size={16} /> : <span style={{ display: 'inline-flex', alignItems: 'center' }}><Save size={16} /></span>}
-          {saved ? "Saved Configuration!" : "Save Changes"}
-        </button>
+        )}
 
       </div>
     </div>
