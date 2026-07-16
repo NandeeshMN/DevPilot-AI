@@ -1,0 +1,331 @@
+import React, { useState } from 'react';
+import { Terminal, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
+
+import { User } from '../context/AuthContext';
+
+interface LoginProps {
+  onLoginSuccess: (user: User, token: string) => void;
+  onNavigateToRegister: () => void;
+  onNavigateToForgot: () => void;
+  onBackToLanding: () => void;
+}
+
+export default function Login({ onLoginSuccess, onNavigateToRegister, onNavigateToForgot, onBackToLanding }: LoginProps) {
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  
+  // Validation States
+  const [emailError, setEmailError] = useState<string>("");
+  const [passwordError, setPasswordError] = useState<string>("");
+  const [formError, setFormError] = useState<string>("");
+
+
+  const validateEmail = (val: string) => {
+    if (!val) {
+      setEmailError("Email is required");
+      return false;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(val)) {
+      setEmailError("Please enter a valid email address");
+      return false;
+    }
+    setEmailError("");
+    return true;
+  };
+
+  const validatePassword = (val: string) => {
+    if (!val) {
+      setPasswordError("Password is required");
+      return false;
+    }
+    if (val.length < 6) {
+      setPasswordError("Password must be at least 6 characters long");
+      return false;
+    }
+    setPasswordError("");
+    return true;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError("");
+
+    const isEmailValid = validateEmail(email);
+    const isPasswordValid = validatePassword(password);
+
+    if (!isEmailValid || !isPasswordValid) return;
+
+    setLoading(true);
+
+    fetch('http://localhost:5000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.toLowerCase(), password })
+    })
+    .then(async (res) => {
+      setLoading(false);
+      const data = await res.json();
+      if (!res.ok) {
+        setFormError(data.error || "An error occurred during authentication.");
+      } else {
+        onLoginSuccess(data.user, data.token);
+      }
+    })
+    .catch(() => {
+      setLoading(false);
+      setFormError("Unable to connect to the authentication server.");
+    });
+  };
+
+  /* 
+    FUTURE ENHANCEMENT: GitHub OAuth Flow handler
+    can be defined here:
+    
+    const handleGithubOAuth = () => {
+      // triggers OAuth redirect / auth logic
+    };
+  */
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: '#0B1120',
+      position: 'relative',
+      overflow: 'hidden',
+      padding: '20px'
+    }}>
+      {/* Background Glows */}
+      <div className="glow-bg glow-blue"></div>
+      <div className="glow-bg glow-purple"></div>
+
+      <div className="glass-card" style={{
+        padding: '40px 32px',
+        maxWidth: '420px',
+        width: '100%',
+        position: 'relative',
+        zIndex: 1,
+        boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)'
+      }}>
+        {/* Neon top line */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '3px', background: 'var(--brand-gradient)' }}></div>
+
+        {/* Brand Header */}
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div 
+            onClick={onBackToLanding}
+            style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              cursor: 'pointer',
+              marginBottom: '16px'
+            }}
+          >
+            <div style={{
+              background: 'var(--brand-gradient)',
+              width: '32px',
+              height: '32px',
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Terminal size={18} color="#fff" />
+            </div>
+            <span style={{ fontSize: '20px', fontWeight: '800', background: 'var(--brand-gradient)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+              DevPilot AI
+            </span>
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--color-text-main)' }}>Welcome Back</h2>
+          <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '6px' }}>
+            Enter your credentials to enter the workspace
+          </p>
+        </div>
+
+        {formError && (
+          <div style={{
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            color: '#EF4444',
+            padding: '10px 14px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            marginBottom: '20px',
+            textAlign: 'center'
+          }}>
+            {formError}
+          </div>
+        )}
+
+
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Email Address */}
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>
+              Email Address
+            </label>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dark)', display: 'flex' }}>
+                <Mail size={16} />
+              </span>
+              <input
+                type="text"
+                placeholder="developer@devpilot.ai"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (emailError) validateEmail(e.target.value);
+                }}
+                onBlur={() => validateEmail(email)}
+                style={{
+                  width: '100%',
+                  background: '#050811',
+                  border: `1px solid ${emailError ? '#EF4444' : 'rgba(255, 255, 255, 0.08)'}`,
+                  borderRadius: '8px',
+                  padding: '10px 12px 10px 38px',
+                  fontSize: '13.5px',
+                  color: 'var(--color-text-main)',
+                  outline: 'none',
+                  transition: '0.2s'
+                }}
+              />
+            </div>
+            {emailError && (
+              <span style={{ color: '#EF4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>{emailError}</span>
+            )}
+          </div>
+
+          {/* Password */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <label style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontWeight: '600', margin: 0 }}>
+                Password
+              </label>
+              <button 
+                type="button" 
+                onClick={onNavigateToForgot} 
+                style={{ 
+                  background: 'transparent', 
+                  border: 'none', 
+                  color: '#00F2FE', 
+                  fontSize: '11px', 
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: 0
+                }}
+              >
+                Forgot password?
+              </button>
+            </div>
+            <div style={{ position: 'relative' }}>
+              <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-dark)', display: 'flex' }}>
+                <Lock size={16} />
+              </span>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (passwordError) validatePassword(e.target.value);
+                }}
+                onBlur={() => validatePassword(password)}
+                style={{
+                  width: '100%',
+                  background: '#050811',
+                  border: `1px solid ${passwordError ? '#EF4444' : 'rgba(255, 255, 255, 0.08)'}`,
+                  borderRadius: '8px',
+                  padding: '10px 38px 10px 38px',
+                  fontSize: '13.5px',
+                  color: 'var(--color-text-main)',
+                  outline: 'none',
+                  transition: '0.2s'
+                }}
+              />
+              <button 
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{ 
+                  position: 'absolute', 
+                  right: '12px', 
+                  top: '50%', 
+                  transform: 'translateY(-50%)', 
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-text-dark)',
+                  cursor: 'pointer',
+                  display: 'flex'
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {passwordError && (
+              <span style={{ color: '#EF4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>{passwordError}</span>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ width: '100%', padding: '12px', marginTop: '10px', background: 'var(--brand-gradient)', display: 'flex', gap: '8px', justifyContent: 'center' }}
+          >
+            {loading ? (
+              <>
+                <Loader2 size={16} className="animate-spin" /> Authenticating...
+              </>
+            ) : (
+              <>
+                Sign In <ArrowRight size={16} />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Future Enhancement Placeholder: GitHub OAuth Trigger */}
+        {/* 
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0', color: 'var(--color-text-dark)' }}>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
+          <span style={{ fontSize: '11px' }}>OR</span>
+          <hr style={{ flex: 1, border: 'none', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
+        </div>
+        <button 
+          onClick={handleGithubOAuth}
+          className="btn btn-secondary" 
+          style={{ width: '100%', fontSize: '13px', gap: '8px' }}
+        >
+          <Github size={16} /> Continue with GitHub
+        </button>
+        */}
+
+        {/* Navigator Links */}
+        <div style={{ marginTop: '28px', textAlign: 'center', fontSize: '12.5px', color: 'var(--color-text-muted)' }}>
+          Don't have an account?{' '}
+          <span 
+            onClick={onNavigateToRegister}
+            style={{ color: '#00F2FE', cursor: 'pointer', fontWeight: '600', textDecoration: 'underline' }}
+          >
+            Create account
+          </span>
+        </div>
+
+        <div style={{ marginTop: '16px', textAlign: 'center' }}>
+          <span 
+            onClick={onBackToLanding}
+            style={{ fontSize: '12px', color: 'var(--color-text-dark)', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Back to Home
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
