@@ -5,17 +5,28 @@ const fs = require('fs');
 let db;
 
 try {
-  // Read service account path from env variables (relative to root)
-  const envPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-  const serviceAccountPath = envPath 
-    ? path.resolve(process.cwd(), envPath) 
-    : path.join(__dirname, '../firebase-service-account.json');
+  let serviceAccount;
 
-  if (!fs.existsSync(serviceAccountPath)) {
-    throw new Error(`Firebase service account file not found at path: ${serviceAccountPath}`);
+  // Try to load credentials from environment variable JSON string first
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    } catch (parseErr) {
+      throw new Error(`Failed to parse FIREBASE_SERVICE_ACCOUNT_JSON env variable: ${parseErr.message}`);
+    }
+  } else {
+    // Fall back to reading from local file path
+    const envPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+    const serviceAccountPath = envPath 
+      ? path.resolve(process.cwd(), envPath) 
+      : path.join(__dirname, '../firebase-service-account.json');
+
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(`Firebase credentials not found. Set FIREBASE_SERVICE_ACCOUNT_JSON env variable or add file at: ${serviceAccountPath}`);
+    }
+
+    serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
   }
-
-  const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
   // Ensure Firebase is initialized only once
   if (admin.apps.length === 0) {
