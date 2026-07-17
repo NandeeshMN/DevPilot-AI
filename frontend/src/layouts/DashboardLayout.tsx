@@ -242,9 +242,71 @@ export default function DashboardLayout({ children, activeTab, setActiveTab, onL
       {/* Main Frame Wrapper */}
       <div className="main-wrapper" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
         <main className="content-body" style={{ flexGrow: 1, overflowY: 'auto' }}>
+          {activeTab !== 'chat' && (
+            <div 
+              className="glass"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '16px',
+                padding: '12px 20px',
+                borderRadius: '10px',
+                marginBottom: '24px',
+                borderLeft: '4px solid #F59E0B',
+                background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.04) 0%, rgba(26, 35, 51, 0.3) 100%)',
+                boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+                animation: 'devpilotFadeInDown 0.3s ease-out',
+                position: 'relative',
+                overflow: 'hidden'
+              }}
+            >
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: '120px',
+                background: 'radial-gradient(circle, rgba(245, 158, 11, 0.06) 0%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              
+              <div style={{
+                background: 'rgba(245, 158, 11, 0.08)',
+                border: '1px solid rgba(245, 158, 11, 0.15)',
+                borderRadius: '6px',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                color: '#FBBF24',
+                fontSize: '14px'
+              }}>
+                🚧
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#FBBF24', letterSpacing: '0.2px' }}>
+                  This feature is currently under development
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', lineHeight: '1.4' }}>
+                  We are refining this tool to bring you an optimized experience. Thank you for your patience!
+                </span>
+              </div>
+
+              <style>{`
+                @keyframes devpilotFadeInDown {
+                  from { opacity: 0; transform: translateY(-10px); }
+                  to { opacity: 1; transform: translateY(0); }
+                }
+              `}</style>
+            </div>
+          )}
           {children}
         </main>
       </div>
+
 
       {/* Confirmation Modal */}
       {showConfirm && (
