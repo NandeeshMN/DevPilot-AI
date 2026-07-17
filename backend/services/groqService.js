@@ -46,6 +46,30 @@ class GroqService {
       throw error;
     }
   }
+  /**
+   * Streams a conversational assistant response from Groq as an async generator.
+   * @param {string} prompt
+   * @param {Array<Object>} conversationHistory
+   * @yields {string} text chunk
+   */
+  async *generateGroqResponseStream(prompt, conversationHistory = []) {
+    const messages = conversationHistory.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : 'user',
+      content: msg.content
+    }));
+    messages.push({ role: 'user', content: prompt });
+
+    const stream = await this.groq.chat.completions.create({
+      messages,
+      model: this.defaultModel,
+      stream: true
+    });
+
+    for await (const chunk of stream) {
+      const text = chunk.choices[0]?.delta?.content;
+      if (text) yield text;
+    }
+  }
 }
 
 module.exports = new GroqService();

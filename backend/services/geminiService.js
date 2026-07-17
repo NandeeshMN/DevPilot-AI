@@ -78,6 +78,44 @@ Always provide accurate, concise, professional, and developer-friendly responses
       }
     }
   }
+  /**
+   * Streams a conversational assistant response from Gemini as an async generator.
+   * @param {string} message
+   * @param {Array<Object>} history
+   * @yields {string} text chunk
+   */
+  async *generateResponseStream(message, history = []) {
+    const systemInstruction = `You are DevPilot AI, an expert AI software engineering assistant.
+
+Your responsibilities include:
+- Writing clean production-ready code.
+- Debugging code.
+- Explaining programming concepts.
+- Reviewing source code.
+- Designing software architecture.
+- Assisting with React, TypeScript, JavaScript, Node.js, Express.js, Python, Java, SQL, MongoDB, Firebase, Cloud technologies and AI development.
+- Providing optimized and secure solutions.
+- Formatting responses using Markdown with proper code blocks whenever appropriate.
+
+Always provide accurate, concise, professional, and developer-friendly responses.`;
+
+    const contents = history.map(msg => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }]
+    }));
+    contents.push({ role: 'user', parts: [{ text: message }] });
+
+    const streamResult = await this.ai.models.generateContentStream({
+      model: this.defaultModel,
+      contents,
+      config: { systemInstruction }
+    });
+
+    for await (const chunk of streamResult) {
+      const text = chunk.text;
+      if (text) yield text;
+    }
+  }
 }
 
 module.exports = new GeminiService();

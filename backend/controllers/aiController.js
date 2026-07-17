@@ -1,5 +1,6 @@
 const aiService = require('../services/aiService');
 const geminiService = require('../services/geminiService');
+const groqService = require('../services/groqService');
 const { admin, db } = require('../config/firebase');
 const { sendError } = require('../utils/responseHandler');
 
@@ -81,19 +82,17 @@ const getTip = async (req, res, next) => {
 };
 
 /**
- * Enterprise endpoint running conversational engineering prompts through Gemini models.
- * Reuses active authMiddleware, validates inputs, and records history inside Firestore.
+ * Streaming chat endpoint using Server-Sent Events.
+ * Streams AI tokens to the client as they arrive, then persists to Firestore.
  */
 const chat = async (req, res, next) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, provider } = req.body;
 
-    // Reject empty messages or prompts
     if (!message || typeof message !== 'string' || !message.trim()) {
       return sendError(res, "Message prompt cannot be empty.", 400);
     }
 
-    // Extract authenticated user ID from Bearer JWT
     const userId = req.user.id.toLowerCase();
     const chatsRef = db.collection('chats');
 
@@ -103,6 +102,7 @@ const chat = async (req, res, next) => {
     let createdAt = new Date().toISOString();
     let title = "";
 
+    // ── Load conversation history ───────────────────────────────────────────
     if (conversationId) {
       conversationDoc = chatsRef.doc(conversationId);
       const chatDocSnap = await conversationDoc.get();
@@ -113,7 +113,6 @@ const chat = async (req, res, next) => {
         createdAt = chatData.createdAt;
         isNew = false;
 
-        // Fetch messages from subcollection ordered by timestamp asc
         const messagesSnapshot = await conversationDoc
           .collection('messages')
           .orderBy('timestamp', 'asc')
@@ -121,60 +120,17 @@ const chat = async (req, res, next) => {
 
         existingMessages = messagesSnapshot.docs.map(doc => {
           const data = doc.data();
-          return {
-            role: data.role,
-            content: data.content
-          };
+          return { role: data.role, content: data.content };
         });
-      } else {
-        // Fallback: Check the old users/{userId}/conversations/{conversationId} path
-        const oldDocRef = db.collection('users').doc(userId).collection('conversations').doc(conversationId);
-        const oldDocSnap = await oldDocRef.get();
-
-        if (oldDocSnap.exists) {
-          const oldData = oldDocSnap.data();
-          title = oldData.title || "AI Chat Thread";
-          createdAt = oldData.createdAt || new Date().toISOString();
-          isNew = false;
-
-          existingMessages = (oldData.messages || []).map(msg => ({
-            role: msg.role === 'model' || msg.role === 'assistant' ? 'assistant' : 'user',
-            content: msg.content
-          }));
-
-          // Self-heal: Migrate this specific conversation on the fly to prevent future fallbacks
-          await conversationDoc.set({
-            userId,
-            title,
-            createdAt,
-            updatedAt: new Date().toISOString()
-          });
-
-          for (const [index, msg] of (oldData.messages || []).entries()) {
-            let msgTimestamp;
-            if (msg.timestamp) {
-              msgTimestamp = msg.timestamp;
-            } else {
-              const baseDate = new Date(createdAt);
-              baseDate.setSeconds(baseDate.getSeconds() + index);
-              msgTimestamp = admin.firestore.Timestamp.fromDate(baseDate);
-            }
-
-            await conversationDoc.collection('messages').add({
-              role: msg.role === 'model' || msg.role === 'assistant' ? 'assistant' : 'user',
-              content: msg.content || "",
-              model: msg.model || (msg.role === 'model' || msg.role === 'assistant' ? 'gemini' : null),
-              timestamp: msgTimestamp
-            });
-          }
-        }
       }
     }
+
+    // Cap history to last 10 messages to keep prompts small and fast
+    const trimmedHistory = existingMessages.slice(-10);
 
     if (isNew) {
       conversationDoc = conversationId ? chatsRef.doc(conversationId) : chatsRef.doc();
       title = message.trim().substring(0, 50);
-
       await conversationDoc.set({
         userId,
         title,
@@ -183,43 +139,63 @@ const chat = async (req, res, next) => {
       });
     }
 
-    // Call unified AI Service wrapper supporting model fallback
-    const { provider } = req.body;
-    const reply = await aiService.generateAIResponse({
-      provider,
-      prompt: message,
-      history: existingMessages
-    });
+    // ── Set SSE headers ────────────────────────────────────────────────────
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering on Render
+    res.flushHeaders();
 
-    // Save user message in messages subcollection
-    await conversationDoc.collection('messages').add({
-      role: 'user',
-      content: message,
-      model: null,
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
+    // ── Stream AI response ─────────────────────────────────────────────────
+    let fullReply = '';
+    const selectedProvider = provider || 'gemini';
 
-    // Save assistant message in messages subcollection
-    await conversationDoc.collection('messages').add({
-      role: 'assistant',
-      content: reply,
-      model: provider || 'gemini',
-      timestamp: admin.firestore.FieldValue.serverTimestamp()
-    });
+    try {
+      let stream;
+      if (selectedProvider === 'groq') {
+        stream = groqService.generateGroqResponseStream(message, trimmedHistory);
+      } else {
+        stream = geminiService.generateResponseStream(message, trimmedHistory);
+      }
 
-    // Update parent doc updatedAt metadata
-    await conversationDoc.update({
-      updatedAt: new Date().toISOString()
-    });
+      for await (const chunk of stream) {
+        fullReply += chunk;
+        // SSE format: "data: <payload>\n\n"
+        res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+      }
+    } catch (streamError) {
+      // Fallback to Groq if Gemini fails mid-stream
+      if (selectedProvider !== 'groq') {
+        console.warn('Gemini stream failed, falling back to Groq:', streamError.message);
+        fullReply = '';
+        try {
+          for await (const chunk of groqService.generateGroqResponseStream(message, trimmedHistory)) {
+            fullReply += chunk;
+            res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+          }
+        } catch (groqErr) {
+          res.write(`data: ${JSON.stringify({ error: 'AI service temporarily unavailable.' })}\n\n`);
+          res.end();
+          return;
+        }
+      } else {
+        res.write(`data: ${JSON.stringify({ error: 'AI service temporarily unavailable.' })}\n\n`);
+        res.end();
+        return;
+      }
+    }
 
-    // Yield structured JSON response
-    return res.status(200).json({
-      success: true,
-      conversationId: conversationDoc.id,
-      reply,
-      createdAt,
-      model: provider === 'groq' ? (process.env.GROQ_MODEL || 'llama-3.3-70b-versatile') : (process.env.GEMINI_MODEL || 'gemini-3.5-flash')
-    });
+    // Signal end of stream
+    res.write(`data: ${JSON.stringify({ done: true, conversationId: conversationDoc.id })}\n\n`);
+    res.end();
+
+    // ── Persist to Firestore asynchronously (does NOT block response) ───────
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    Promise.all([
+      conversationDoc.collection('messages').add({ role: 'user', content: message, model: null, timestamp: now }),
+      conversationDoc.collection('messages').add({ role: 'assistant', content: fullReply, model: selectedProvider, timestamp: now }),
+      conversationDoc.update({ updatedAt: new Date().toISOString() })
+    ]).catch(err => console.error('Firestore persist error:', err));
 
   } catch (error) {
     next(error);

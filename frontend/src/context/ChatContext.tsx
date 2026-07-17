@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState } from 'react';
 import { UIChatMessage } from '../types/chat';
-import aiService from '../services/aiService';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://devpilot-ai-ob2b.onrender.com/api';
 
 interface ChatContextType {
   messages: UIChatMessage[];
@@ -17,6 +18,7 @@ const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 /**
  * Context Provider wrapping active assistant prompt states and histories.
+ * Uses Server-Sent Events (SSE) streaming for real-time word-by-word responses.
  */
 export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<UIChatMessage[]>([
@@ -43,57 +45,118 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
   const sendMessage = async (messageText: string, provider?: string) => {
     if (!messageText.trim() || loading) return;
-    
+
     setError(null);
     setLoading(true);
 
+    // Add user message immediately
     const userMessage: UIChatMessage = {
       sender: 'user',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       text: messageText
     };
-
     setMessages(prev => [...prev, userMessage]);
 
+    // Placeholder assistant message that we'll stream into
+    const assistantPlaceholder: UIChatMessage = {
+      sender: 'assistant',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: ''
+    };
+    setMessages(prev => [...prev, assistantPlaceholder]);
+    const assistantIndex = messages.length + 1; // position after user msg
+
     try {
-      // Call backend API, passing conversationId if one has already been created
-      const response = await aiService.chat(messageText, conversationId || undefined, provider);
-      
-      // Save the returned conversationId for subsequent messages
-      if (response.conversationId) {
-        setConversationId(response.conversationId);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE}/ai/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          message: messageText,
+          conversationId: conversationId || undefined,
+          provider: provider || 'gemini'
+        })
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(`Server error: ${response.status}`);
       }
 
-      const assistantMessage: UIChatMessage = {
-        sender: 'assistant',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: response.reply
-      };
-      
-      setMessages(prev => [...prev, assistantMessage]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let accumulatedText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE lines
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? ''; // keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const payload = line.slice(6).trim();
+          if (!payload) continue;
+
+          try {
+            const parsed = JSON.parse(payload);
+
+            if (parsed.chunk) {
+              accumulatedText += parsed.chunk;
+              // Update the last message (assistant placeholder) in real time
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = {
+                  ...updated[updated.length - 1],
+                  text: accumulatedText
+                };
+                return updated;
+              });
+            }
+
+            if (parsed.done && parsed.conversationId) {
+              setConversationId(parsed.conversationId);
+            }
+
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+          } catch (parseErr) {
+            // Skip malformed SSE lines
+          }
+        }
+      }
     } catch (err: any) {
-      const errMsg = err.response?.data?.error || err.message || 'Failed to fetch response';
+      const errMsg = err.message || 'Failed to fetch response';
       setError(errMsg);
-      
-      const errorMessage: UIChatMessage = {
-        sender: 'assistant',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        text: `Error: ${errMsg}. Please verify that your backend server is running and your API key limits are not exceeded.`
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {
+          ...updated[updated.length - 1],
+          text: `Error: ${errMsg}. Please verify that your backend server is running and your API key limits are not exceeded.`
+        };
+        return updated;
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ChatContext.Provider value={{ 
-      messages, 
-      setMessages, 
-      loading, 
-      error, 
-      sendMessage, 
-      conversationId, 
+    <ChatContext.Provider value={{
+      messages,
+      setMessages,
+      loading,
+      error,
+      sendMessage,
+      conversationId,
       setConversationId,
       resetChat
     }}>
