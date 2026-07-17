@@ -40,6 +40,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [showMobileHistory, setShowMobileHistory] = useState<boolean>(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom of chat
@@ -92,10 +93,16 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   };
 
   // Delete a historical conversation chat thread
-  const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
+  const handleDeleteConversation = (e: React.MouseEvent, convId: string) => {
     e.stopPropagation();
     setOpenMenuId(null);
-    if (!window.confirm("Are you sure you want to delete this chat thread?")) return;
+    setConfirmTarget(convId);
+  };
+
+  const doDeleteConversation = async () => {
+    if (!confirmTarget) return;
+    const convId = confirmTarget;
+    setConfirmTarget(null);
     try {
       await aiService.deleteConversation(convId);
       setConversations(prev => prev.filter(c => c.id !== convId));
@@ -607,6 +614,137 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
           </div>
         </div>
       )}
+
+      {/* Custom delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!confirmTarget}
+        onConfirm={doDeleteConversation}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Custom in-app confirmation dialog replacing browser window.confirm().
+ */
+function ConfirmDialog({ open, onConfirm, onCancel }: {
+  open: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.6)',
+        backdropFilter: 'blur(6px)',
+        zIndex: 99999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'fadeIn 0.15s ease'
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'linear-gradient(135deg, #141B2D 0%, #1a2440 100%)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          borderRadius: '16px',
+          padding: '32px 28px 24px',
+          width: '100%',
+          maxWidth: '360px',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(239,68,68,0.15)',
+          animation: 'slideUp 0.2s ease',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '16px'
+        }}
+      >
+        {/* Icon */}
+        <div style={{
+          width: '52px',
+          height: '52px',
+          borderRadius: '50%',
+          background: 'rgba(239,68,68,0.12)',
+          border: '1px solid rgba(239,68,68,0.25)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          <Trash size={22} color="#F87171" />
+        </div>
+
+        {/* Title */}
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '17px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '6px' }}>
+            Delete Chat Thread?
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--color-text-muted)', lineHeight: '1.5' }}>
+            This action cannot be undone. The conversation and all its messages will be permanently removed.
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: '10px', width: '100%', marginTop: '4px' }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              padding: '10px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'var(--color-text-muted)',
+              fontSize: '14px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'var(--color-text-main)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--color-text-muted)'; }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            style={{
+              flex: 1,
+              padding: '10px',
+              borderRadius: '8px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #EF4444, #DC2626)',
+              color: '#fff',
+              fontSize: '14px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 4px 14px rgba(239,68,68,0.35)'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(239,68,68,0.5)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 4px 14px rgba(239,68,68,0.35)'; }}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);    }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
