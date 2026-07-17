@@ -338,7 +338,22 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                   border: msg.sender === 'user' ? '1px solid rgba(139, 92, 246, 0.2)' : '1px solid rgba(255, 255, 255, 0.08)',
                   background: msg.sender === 'user' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.01)'
                 }}>
-                  <div>{renderMarkdown(msg.text)}</div>
+                  {/* If this is the last assistant message and it's empty, show typing dots */}
+                  {msg.sender === 'assistant' && !msg.text && idx === messages.length - 1 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '2px 0' }}>
+                      <div style={{ width: '7px', height: '7px', background: '#4F8CFF', borderRadius: '50%', animation: 'dotBounce 1.2s ease-in-out infinite', animationDelay: '0s' }} />
+                      <div style={{ width: '7px', height: '7px', background: '#8B5CF6', borderRadius: '50%', animation: 'dotBounce 1.2s ease-in-out infinite', animationDelay: '0.2s' }} />
+                      <div style={{ width: '7px', height: '7px', background: '#EC4899', borderRadius: '50%', animation: 'dotBounce 1.2s ease-in-out infinite', animationDelay: '0.4s' }} />
+                      <style>{`
+                        @keyframes dotBounce {
+                          0%, 80%, 100% { transform: translateY(0) scale(1); opacity: 0.5; }
+                          40%           { transform: translateY(-7px) scale(1.2); opacity: 1; }
+                        }
+                      `}</style>
+                    </div>
+                  ) : (
+                    <div>{renderMarkdown(msg.text)}</div>
+                  )}
 
                   {/* Render Code Block if available */}
                   {msg.code && (
@@ -416,27 +431,6 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
             </div>
           ))}
 
-          {loading && (
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <div style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                background: 'var(--button-gradient)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <Bot size={16} color="#fff" />
-              </div>
-              <div className="glass" style={{ padding: '16px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ width: '6px', height: '6px', background: '#4F8CFF', borderRadius: '50%', animation: 'pulse 1s infinite alternate' }}></div>
-                <div style={{ width: '6px', height: '6px', background: '#8B5CF6', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.2s' }}></div>
-                <div style={{ width: '6px', height: '6px', background: '#EC4899', borderRadius: '50%', animation: 'pulse 1s infinite alternate 0.4s' }}></div>
-                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>DevPilot is writing code...</span>
-              </div>
-            </div>
-          )}
           <div ref={chatEndRef} />
         </div>
 
