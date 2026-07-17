@@ -237,32 +237,12 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
           </div>
         </div>
 
-        {/* Stats Grid */}
-        <div className="metrics-grid">
-          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>Active Workspaces</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#06B6D4' }}>{stats.workspaces}</div>
-          </div>
-          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>AI Conversations</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#8B5CF6' }}>{stats.conversations}</div>
-          </div>
-          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>AI Requests Today</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#EF4444' }}>{stats.requestsToday}</div>
-          </div>
-          <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>Saved Snippets</div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color: '#10B981' }}>{stats.savedSnippets}</div>
-          </div>
-        </div>
-
         {/* Quick Tools Grid */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
             <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--color-text-main)', letterSpacing: '0.5px' }}>Grid Tools</h3>
-            <span style={{ fontSize: '11px', color: '#00F2FE', cursor: 'pointer', fontWeight: '600' }}>EXPAND ALL</span>
           </div>
+
           <div className="dashboard-grid">
             {tools.map((t, idx) => {
               const Icon = t.icon;
