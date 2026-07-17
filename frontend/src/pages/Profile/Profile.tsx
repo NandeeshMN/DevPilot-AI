@@ -79,6 +79,7 @@ export default function Profile() {
 
   // Local state for profile picture preview in Edit Mode
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // Fetch details from backend profile service
   useEffect(() => {
@@ -116,9 +117,10 @@ export default function Profile() {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 1024 * 1024) {
-        alert("Please upload an image smaller than 1MB.");
+        setPhotoError("Please upload an image smaller than 1MB.");
         return;
       }
+      setPhotoError(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         const base64Str = reader.result as string;
@@ -132,6 +134,15 @@ export default function Profile() {
     }
   };
 
+  const handleRemovePhoto = () => {
+    setPhotoError(null);
+    setSelectedImage(""); // Sentinel for removal
+    setEditSettings(prev => ({
+      ...prev,
+      photoURL: "" // clear preview
+    }));
+  };
+
   const triggerFileInput = () => {
     fileInputRef.current?.click();
   };
@@ -139,6 +150,7 @@ export default function Profile() {
   // Discard changes & close edit mode
   const handleCancel = () => {
     setSelectedImage(null);
+    setPhotoError(null);
     setEditSettings({ ...settings });
     setIsEditMode(false);
   };
@@ -154,7 +166,7 @@ export default function Profile() {
       let finalPhotoURL = settings.photoURL;
 
       // If a new photo was selected, upload it to Firebase Storage
-      if (selectedImage) {
+      if (selectedImage && selectedImage !== "") {
         try {
           const storageRef = ref(storage, `profiles/${email}/avatar`);
           await uploadString(storageRef, selectedImage, 'data_url');
@@ -164,6 +176,8 @@ export default function Profile() {
           // Fallback to storing Base64 string directly if storage is blocked
           finalPhotoURL = selectedImage;
         }
+      } else if (selectedImage === "") {
+        finalPhotoURL = "";
       }
 
       const res = await userService.updateProfile(
@@ -191,6 +205,7 @@ export default function Profile() {
         });
 
         setSelectedImage(null);
+        setPhotoError(null);
         setSaveStatus('success');
 
         // Auto-return to View Mode after successful save animation delay
@@ -210,6 +225,7 @@ export default function Profile() {
       setSaving(false);
     }
   };
+
 
   // Render Skeleton Loader while loading
   if (loadingProfile) {
@@ -385,13 +401,53 @@ export default function Profile() {
                 </div>
               </div>
 
-              <button 
-                onClick={triggerFileInput}
-                className="btn btn-secondary" 
-                style={{ marginTop: '16px', padding: '6px 14px', fontSize: '12px', gap: '6px' }}
-              >
-                <Camera size={14} /> Change Photo
-              </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                <button 
+                  onClick={triggerFileInput}
+                  className="btn btn-secondary" 
+                  style={{ padding: '6px 14px', fontSize: '12px', gap: '6px' }}
+                >
+                  <Camera size={14} /> Change Photo
+                </button>
+                {editSettings.photoURL && (
+                  <button 
+                    onClick={handleRemovePhoto}
+                    className="btn btn-secondary" 
+                    style={{ 
+                      padding: '6px 14px', 
+                      fontSize: '12px', 
+                      gap: '6px', 
+                      color: '#EF4444', 
+                      borderColor: 'rgba(239, 68, 68, 0.25)', 
+                      background: 'rgba(239, 68, 68, 0.04)' 
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.04)'; }}
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
+
+              {photoError && (
+                <div style={{
+                  marginTop: '12px',
+                  color: '#EF4444',
+                  fontSize: '12px',
+                  background: 'rgba(239, 68, 68, 0.06)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  textAlign: 'center',
+                  fontWeight: '600',
+                  animation: 'fadeIn 0.2s ease',
+                  width: '100%',
+                  maxWidth: '300px'
+                }}>
+                  {photoError}
+                </div>
+              )}
+
               
               <input 
                 type="file"
