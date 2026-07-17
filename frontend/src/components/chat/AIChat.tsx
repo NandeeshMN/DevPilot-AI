@@ -110,12 +110,21 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const handlePinConversation = async (e: React.MouseEvent, convId: string) => {
     e.stopPropagation();
     setOpenMenuId(null);
+
+    // Optimistic update — move immediately in the UI
+    const prevConversations = conversations;
+    const target = conversations.find(c => c.id === convId);
+    if (!target) return;
+    const newPinned = !target.isPinned;
+    setConversations(prev => prev.map(c =>
+      c.id === convId ? { ...c, isPinned: newPinned } : c
+    ));
+
     try {
-      const res = await aiService.togglePinConversation(convId);
-      setConversations(prev => prev.map(c =>
-        c.id === convId ? { ...c, isPinned: res.isPinned } : c
-      ));
+      await aiService.togglePinConversation(convId);
     } catch (err) {
+      // Revert on failure
+      setConversations(prevConversations);
       console.error("Error pinning conversation:", err);
     }
   };
