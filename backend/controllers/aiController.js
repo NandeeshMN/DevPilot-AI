@@ -330,6 +330,38 @@ const deleteConversation = async (req, res, next) => {
   }
 };
 
+/**
+ * Toggles the pinned status of a conversation.
+ */
+const togglePinConversation = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id.toLowerCase();
+
+    const chatDocRef = db.collection('chats').doc(conversationId);
+    const chatDocSnap = await chatDocRef.get();
+
+    if (!chatDocSnap.exists) {
+      return sendError(res, "Conversation not found", 404);
+    }
+
+    const chatData = chatDocSnap.data();
+    if (chatData.userId !== userId) {
+      return sendError(res, "Unauthorized access to conversation", 403);
+    }
+
+    const newPinnedStatus = !chatData.isPinned;
+    await chatDocRef.update({
+      isPinned: newPinnedStatus,
+      updatedAt: new Date().toISOString()
+    });
+
+    return res.json({ success: true, isPinned: newPinnedStatus });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   explainCode,
   debugCode,
@@ -340,5 +372,6 @@ module.exports = {
   chat,
   getConversations,
   getConversationMessages,
-  deleteConversation
+  deleteConversation,
+  togglePinConversation
 };

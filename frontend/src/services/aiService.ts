@@ -68,6 +68,11 @@ class AIService {
     const response = await api.delete(`/ai/conversations/${conversationId}`);
     return response.data;
   }
+
+  async togglePinConversation(conversationId: string): Promise<any> {
+    const response = await api.put(`/ai/conversations/${conversationId}/pin`);
+    return response.data;
+  }
 }
 
 export const aiService = new AIService();

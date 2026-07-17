@@ -4,12 +4,14 @@ import {
   Mic, 
   Send, 
   Plus, 
-  Pin, 
+  Pin,
+  PinOff,
   MessageSquare, 
   Copy, 
   Check, 
   Bot,
-  Trash
+  Trash,
+  MoreHorizontal
 } from 'lucide-react';
 import useChat from '../../hooks/useChat';
 import { useAuthContext } from '../../context/AuthContext';
@@ -37,6 +39,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const [provider, setProvider] = useState<string>("gemini");
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [showMobileHistory, setShowMobileHistory] = useState<boolean>(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom of chat
@@ -90,7 +93,8 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
 
   // Delete a historical conversation chat thread
   const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
-    e.stopPropagation(); // Prevent selection
+    e.stopPropagation();
+    setOpenMenuId(null);
     if (!window.confirm("Are you sure you want to delete this chat thread?")) return;
     try {
       await aiService.deleteConversation(convId);
@@ -100,6 +104,19 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
       }
     } catch (err) {
       console.error("Error deleting conversation:", err);
+    }
+  };
+
+  const handlePinConversation = async (e: React.MouseEvent, convId: string) => {
+    e.stopPropagation();
+    setOpenMenuId(null);
+    try {
+      const res = await aiService.togglePinConversation(convId);
+      setConversations(prev => prev.map(c =>
+        c.id === convId ? { ...c, isPinned: res.isPinned } : c
+      ));
+    } catch (err) {
+      console.error("Error pinning conversation:", err);
     }
   };
 
@@ -148,17 +165,32 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
           <Plus size={16} /> New Chat
         </button>
 
+        {/* Pinned Chats */}
         <div>
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Pin size={10} /> Pinned Chats
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
-              No pinned chats.
-            </div>
+            {conversations.filter(c => c.isPinned).length === 0 ? (
+              <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
+                No pinned chats.
+              </div>
+            ) : conversations.filter(c => c.isPinned).map((c) => (
+              <ConversationItem
+                key={c.id}
+                c={c}
+                conversationId={conversationId}
+                openMenuId={openMenuId}
+                setOpenMenuId={setOpenMenuId}
+                handleSelectConversation={handleSelectConversation}
+                handlePinConversation={handlePinConversation}
+                handleDeleteConversation={handleDeleteConversation}
+              />
+            ))}
           </div>
         </div>
 
+        {/* Recent Chats */}
         <div>
           <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
             Recent Chats
@@ -168,51 +200,18 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
               <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
                 Syncing threads...
               </div>
-            ) : conversations.length > 0 ? (
-              conversations.map((c) => (
-                <div 
-                  key={c.id} 
-                  onClick={() => handleSelectConversation(c.id)}
-                  className="glass" 
-                  style={{ 
-                    padding: '8px 12px', 
-                    borderRadius: '6px', 
-                    fontSize: '12px', 
-                    cursor: 'pointer', 
-                    color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                    borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none',
-                    transition: 'all 0.15s ease'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
-                    <MessageSquare size={12} style={{ flexShrink: 0 }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {c.title || "AI Assistant Chat"}
-                    </span>
-                  </div>
-                  <button
-                    onClick={(e) => handleDeleteConversation(e, c.id)}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'rgba(239, 68, 68, 0.7)',
-                      cursor: 'pointer',
-                      padding: '2px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      borderRadius: '4px',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.7)'}
-                  >
-                    <Trash size={12} />
-                  </button>
-                </div>
+            ) : conversations.filter(c => !c.isPinned).length > 0 ? (
+              conversations.filter(c => !c.isPinned).map((c) => (
+                <ConversationItem
+                  key={c.id}
+                  c={c}
+                  conversationId={conversationId}
+                  openMenuId={openMenuId}
+                  setOpenMenuId={setOpenMenuId}
+                  handleSelectConversation={handleSelectConversation}
+                  handlePinConversation={handlePinConversation}
+                  handleDeleteConversation={handleDeleteConversation}
+                />
               ))
             ) : (
               <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
@@ -550,9 +549,22 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                 <Pin size={10} /> Pinned Chats
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
-                <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
-                  No pinned chats.
-                </div>
+                {conversations.filter(c => c.isPinned).length === 0 ? (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
+                    No pinned chats.
+                  </div>
+                ) : conversations.filter(c => c.isPinned).map((c) => (
+                  <ConversationItem
+                    key={c.id}
+                    c={c}
+                    conversationId={conversationId}
+                    openMenuId={openMenuId}
+                    setOpenMenuId={setOpenMenuId}
+                    handleSelectConversation={(id) => { handleSelectConversation(id); setShowMobileHistory(false); }}
+                    handlePinConversation={handlePinConversation}
+                    handleDeleteConversation={handleDeleteConversation}
+                  />
+                ))}
               </div>
 
               <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
@@ -563,54 +575,18 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                   <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
                     Syncing threads...
                   </div>
-                ) : conversations.length > 0 ? (
-                  conversations.map((c) => (
-                    <div 
-                      key={c.id} 
-                      onClick={() => {
-                        handleSelectConversation(c.id);
-                        setShowMobileHistory(false);
-                      }}
-                      className="glass" 
-                      style={{ 
-                        padding: '8px 12px', 
-                        borderRadius: '6px', 
-                        fontSize: '12px', 
-                        cursor: 'pointer', 
-                        color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        gap: '8px',
-                        borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none',
-                        transition: 'all 0.15s ease'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
-                        <MessageSquare size={12} style={{ flexShrink: 0 }} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {c.title || "AI Assistant Chat"}
-                        </span>
-                      </div>
-                      <button
-                        onClick={(e) => handleDeleteConversation(e, c.id)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'rgba(239, 68, 68, 0.7)',
-                          cursor: 'pointer',
-                          padding: '2px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          borderRadius: '4px',
-                          transition: 'all 0.15s ease'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
-                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.7)'}
-                      >
-                        <Trash size={12} />
-                      </button>
-                    </div>
+                ) : conversations.filter(c => !c.isPinned).length > 0 ? (
+                  conversations.filter(c => !c.isPinned).map((c) => (
+                    <ConversationItem
+                      key={c.id}
+                      c={c}
+                      conversationId={conversationId}
+                      openMenuId={openMenuId}
+                      setOpenMenuId={setOpenMenuId}
+                      handleSelectConversation={(id) => { handleSelectConversation(id); setShowMobileHistory(false); }}
+                      handlePinConversation={handlePinConversation}
+                      handleDeleteConversation={handleDeleteConversation}
+                    />
                   ))
                 ) : (
                   <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
@@ -620,6 +596,142 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Reusable conversation list item with a "..." context menu for Pin and Delete actions.
+ */
+function ConversationItem({ c, conversationId, openMenuId, setOpenMenuId, handleSelectConversation, handlePinConversation, handleDeleteConversation }: {
+  c: any;
+  conversationId: string | null;
+  openMenuId: string | null;
+  setOpenMenuId: (id: string | null) => void;
+  handleSelectConversation: (id: string) => void;
+  handlePinConversation: (e: React.MouseEvent, id: string) => void;
+  handleDeleteConversation: (e: React.MouseEvent, id: string) => void;
+}) {
+  const isOpen = openMenuId === c.id;
+
+  return (
+    <div
+      style={{ position: 'relative' }}
+      onClick={() => handleSelectConversation(c.id)}
+    >
+      <div
+        className="glass"
+        style={{
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          cursor: 'pointer',
+          color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
+          {c.isPinned ? <Pin size={11} style={{ flexShrink: 0, color: '#00F2FE' }} /> : <MessageSquare size={12} style={{ flexShrink: 0 }} />}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {c.title || "AI Assistant Chat"}
+          </span>
+        </div>
+
+        {/* ... menu trigger */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpenMenuId(isOpen ? null : c.id);
+          }}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--color-text-muted)',
+            cursor: 'pointer',
+            padding: '2px 4px',
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: '4px',
+            flexShrink: 0,
+            transition: 'color 0.15s ease'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--color-text-main)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--color-text-muted)'}
+        >
+          <MoreHorizontal size={14} />
+        </button>
+      </div>
+
+      {/* Dropdown menu */}
+      {isOpen && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: '4px',
+            background: '#141B2D',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            zIndex: 9999,
+            minWidth: '140px',
+            overflow: 'hidden'
+          }}
+        >
+          <button
+            onClick={(e) => handlePinConversation(e, c.id)}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--color-text-main)',
+              padding: '9px 14px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'background 0.15s ease'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0,242,254,0.08)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            {c.isPinned ? <PinOff size={13} /> : <Pin size={13} />}
+            {c.isPinned ? 'Unpin Chat' : 'Pin Chat'}
+          </button>
+
+          <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '0 10px' }} />
+
+          <button
+            onClick={(e) => handleDeleteConversation(e, c.id)}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              color: '#F87171',
+              padding: '9px 14px',
+              fontSize: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'background 0.15s ease'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(239,68,68,0.1)')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Trash size={13} />
+            Delete
+          </button>
         </div>
       )}
     </div>

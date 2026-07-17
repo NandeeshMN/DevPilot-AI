@@ -16,5 +16,6 @@ router.post('/ai/chat', authMiddleware, aiController.chat);
 router.get('/ai/conversations', authMiddleware, aiController.getConversations);
 router.get('/ai/conversations/:conversationId', authMiddleware, aiController.getConversationMessages);
 router.delete('/ai/conversations/:conversationId', authMiddleware, aiController.deleteConversation);
+router.put('/ai/conversations/:conversationId/pin', authMiddleware, aiController.togglePinConversation);
 
 module.exports = router;
