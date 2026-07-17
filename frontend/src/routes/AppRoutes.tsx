@@ -47,29 +47,6 @@ export default function AppRoutes() {
         return <ReadmeGenerator />;
       case 'sql':
         return <SQLAssistant />;
-      case 'dsa':
-        return (
-          <div className="glass-card animate-fade-in" style={{ padding: '32px', textAlign: 'center', maxWidth: '640px', margin: '40px auto' }}>
-            <Award size={48} color="#8B5CF6" style={{ margin: '0 auto 20px' }} />
-            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px' }}>DSA Helper Module</h2>
-            <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: '1.6', marginBottom: '24px' }}>
-              Welcome to the Data Structures and Algorithms visual guide workspace. Analyze time complexity parameters, optimize graph routes, and model complex systems using interactive trees.
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', textAlign: 'left', marginBottom: '24px' }}>
-              <div className="glass" style={{ padding: '16px', borderRadius: '10px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '6px' }}>Graph Traversal</h4>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Visualize BFS and DFS pathfinding search flows.</p>
-              </div>
-              <div className="glass" style={{ padding: '16px', borderRadius: '10px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text-main)', marginBottom: '6px' }}>Sorting Optimizations</h4>
-                <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Interactive partitioning simulations for Quicksort and Heapsort.</p>
-              </div>
-            </div>
-            <button className="btn btn-primary" style={{ padding: '8px 20px', fontSize: '13px' }} onClick={() => setActiveTab('chat')}>
-              Ask DSA Questions in Chat
-            </button>
-          </div>
-        );
       case 'settings':
         return <Profile />;
       default:

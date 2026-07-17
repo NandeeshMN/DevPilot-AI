@@ -22,32 +22,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   const [messages, setMessages] = useState<UIChatMessage[]>([
     {
       sender: "assistant",
-      timestamp: "10:42 AM",
-      text: "Certainly! Here's a clean, reusable `useInfiniteScroll` hook. This implementation manages the observer lifecycle and ensures type safety.",
-      code: `import { useEffect, useRef } from 'react';
-
-export const useInfiniteScroll = (callback: () => void) => {
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  const elementRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (observerRef.current) observerRef.current.disconnect();
-    
-    observerRef.current = new IntersectionObserver((entries) => {
-      if (entries[0].isIntersecting) {
-        callback();
-      }
-    });
-
-    if (elementRef.current) {
-      observerRef.current.observe(elementRef.current);
-    }
-
-    return () => observerRef.current?.disconnect();
-  }, [callback]);
-
-  return { elementRef };
-};`
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      text: "Hello! How can I help you today?"
     }
   ]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -58,7 +34,7 @@ export const useInfiniteScroll = (callback: () => void) => {
     setMessages([{
       sender: "assistant",
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      text: "Hello! How can I assist you with your software development today?"
+      text: "Hello! How can I help you today?"
     }]);
     setConversationId(null);
     setError(null);

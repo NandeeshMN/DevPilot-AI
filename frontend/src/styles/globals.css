@@ -392,16 +392,23 @@
   padding: 4px;
 }
 
-.sidebar-close-container {
-  display: none;
-}
-
 .sidebar-container {
-  display: block;
+  display: none;
   flex-shrink: 0;
   width: 260px;
   height: 100%;
   z-index: 1000;
+}
+
+.desktop-navbar {
+  display: flex;
+  height: 76px;
+  background: #080D1A;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 100;
 }
 
 .sidebar-overlay {
@@ -462,6 +469,10 @@
     display: flex;
   }
   
+  .desktop-navbar {
+    display: none !important;
+  }
+  
   .top-nav {
     display: none !important;
   }
@@ -476,6 +487,7 @@
   }
 
   .sidebar-container {
+    display: block !important;
     position: fixed;
     top: 0;
     left: -260px;

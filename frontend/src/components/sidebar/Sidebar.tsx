@@ -37,7 +37,6 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
     { id: 'generate', label: 'Generate Code', icon: Code2 },
     { id: 'readme', label: 'README Generator', icon: FileText },
     { id: 'sql', label: 'SQL Assistant', icon: Database },
-    { id: 'dsa', label: 'DSA Helper', icon: GraduationCap },
     { id: 'settings', label: 'Profile', icon: User },
   ];
 
@@ -45,7 +44,7 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
     <aside className="sidebar">
       {/* Brand Logo */}
       <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px' }}>
           <div style={{
             background: 'var(--brand-gradient)',
             width: '28px',
@@ -57,20 +56,9 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout }: SidebarPr
           }}>
             <Terminal size={15} color="#fff" />
           </div>
-          <span style={{ fontSize: '18px', fontWeight: '800', color: 'var(--color-text-main)' }}>
+          <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--color-text-main)', lineHeight: '1.2' }}>
             DevPilot AI
           </span>
-        </div>
-        <div style={{ 
-          fontSize: '10px', 
-          fontWeight: '700', 
-          letterSpacing: '1.5px', 
-          color: '#00F2FE', 
-          marginBottom: '28px',
-          textTransform: 'uppercase',
-          paddingLeft: '38px'
-        }}>
-          Cyber-Core OS
         </div>
 
         {/* Navigation Items */}

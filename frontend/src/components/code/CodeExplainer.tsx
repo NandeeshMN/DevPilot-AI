@@ -10,21 +10,7 @@ interface AnalysisResult {
 }
 
 export default function CodeExplainer() {
-  const [code, setCode] = useState<string>(`// Paste your function here to analyze complexity
-function findDuplicates(arr) {
-  const seen = new Set();
-  const duplicates = [];
-  
-  for (let i = 0; i < arr.length; i++) {
-    if (seen.has(arr[i])) {
-      duplicates.push(arr[i]);
-    } else {
-      seen.add(arr[i]);
-    }
-  }
-  
-  return duplicates;
-}`);
+  const [code, setCode] = useState<string>("");
   
   const [language, setLanguage] = useState<string>("javascript");
   const [loading, setLoading] = useState<boolean>(false);
@@ -83,27 +69,6 @@ function findDuplicates(arr) {
           </div>
           
           <div style={{ display: 'flex', gap: '10px' }}>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{
-                background: '#0D1322',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '6px',
-                color: 'var(--color-text-main)',
-                fontSize: '12px',
-                padding: '4px 10px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript</option>
-              <option value="python">Python</option>
-              <option value="sql">SQL Query</option>
-              <option value="cpp">C++ Source</option>
-            </select>
-
             <button 
               onClick={handleCopy}
               className="btn btn-secondary" 
@@ -123,7 +88,7 @@ function findDuplicates(arr) {
               <span className="monaco-dot yellow"></span>
               <span className="monaco-dot green"></span>
             </div>
-            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>find_duplicates.{language === 'python' ? 'py' : 'ts'}</span>
+            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)' }}>source_code.txt</span>
           </div>
           <div className="monaco-body">
             <div className="monaco-lines">
@@ -136,6 +101,7 @@ function findDuplicates(arr) {
               onChange={(e) => setCode(e.target.value)}
               className="monaco-textarea"
               spellCheck="false"
+              placeholder="Paste your code here..."
               style={{ minHeight: '300px' }}
             />
           </div>

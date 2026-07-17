@@ -156,55 +156,125 @@ export class Engine {
     };
   }
 
-  /**
-   * Diagnoses root causes of error stacks and returns safe guarded refactored codes.
-   */
   async debugCode(code, error) {
-    await delay(1600);
-    const rootCause = error && error.includes('undefined')
-      ? "A properties property-dereferencing issue. You are attempting to read keys of a variable that evaluates to 'undefined' or 'null' during runtime."
-      : "A asynchronous race condition or variable scope leak where an invalid data container is queried before load verification resolves.";
+    const prompt = `You are a Senior AI Software Architect and Principal Full-Stack Engineer.
+Analyze the following code context.
+Code to debug:
+\`\`\`
+${code}
+\`\`\`
+Predicted error (if any): ${error || "None specified"}
 
-    const solution = error && error.includes('undefined')
-      ? "Implement modern JavaScript optional chaining (?.) or declare standard default properties during destructuring assignments."
-      : "Safeguard structural updates with a local mounted flag or employ AbortControllers to cancel old async fetches before hooks unmount.";
-
-    const correctedCode = code 
-      ? (code.includes('.map') 
-          ? code.replace(/\.map/g, '?.map') 
-          : `// Safely guarded with sanity checkers\nif (!data) return null;\n` + code)
-      : `// Corrected implementation safeguard
-const handleRequest = async (req) => {
-  try {
-    const payload = req?.body ?? {};
-    if (!payload.userId) {
-      throw new Error("Invalid User Identifier");
+You must return a structured JSON object containing your analysis and recommended fixes.
+Return ONLY valid JSON matching this schema structure exactly:
+{
+  "bugType": "Runtime Error | Syntax Error | Type Error | Logic Error | Reference Error | Memory Leak | Performance Issue | Security Vulnerability | API Misuse | Null Pointer | Async Issue | Race Condition | Infinite Loop | Unhandled Exception | Dependency Issue",
+  "severity": "Critical | High | Medium | Low | Informational",
+  "confidence": 98,
+  "confidenceReason": "Confidence explanation in English...",
+  "runtimeError": "The predicted runtime error message (e.g. TypeError: Cannot read properties of undefined (reading 'map'))",
+  "rootCause": "Clear explanation of why it throws the error (e.g. users is undefined. Calling map() on undefined throws a TypeError.)",
+  "correctedCode": "The corrected production-grade code",
+  "diff": [
+    { "type": "unchanged | removed | added", "text": "line content" }
+  ],
+  "explanation": "Clear explanation of changes made in plain English theory (no code snippets, no backticks, no markdown inside description, just english theory)",
+  "alternatives": [
+    {
+      "title": "Title of alternative solution",
+      "code": "alternative code block",
+      "pros": "pros description",
+      "cons": "cons description",
+      "useCase": "usecase description",
+      "recommended": false
     }
-    // Proceed safely
-    return { success: true };
-  } catch (error) {
-    console.error("Execution failed:", error.message);
-    return { success: false, error: error.message };
+  ],
+  "bestPractices": [
+    "Enable strictNullChecks",
+    "Validate API responses"
+  ],
+  "security": [
+    {
+      "risk": "Secrets Exposure | XSS | SQL Injection | Command Injection | Weak Validation | Unsafe Regex | Unsafe eval() | Hardcoded API Keys | None",
+      "description": "Risk description or 'None'"
+    }
+  ],
+  "performance": {
+    "timeComplexity": "O(N)",
+    "spaceComplexity": "O(N)",
+    "complexityChanged": false
+  },
+  "qualityScore": {
+    "original": 3,
+    "corrected": 9,
+    "explanation": "Why the score improved..."
   }
-};`;
+}
 
-    return {
-      rootCause,
-      solution,
-      correctedCode,
-      bestPractice: `// Improved Code (Best Practice using modern ESM & Guard Clauses)
-export const handleExecution = (data = {}) => {
-  const { items = [], meta = { count: 0 } } = data;
-  if (!items.length) {
-    return { status: 'idle', count: 0 };
-  }
-  return {
-    status: 'active',
-    count: meta.count,
-    payload: items.map(item => item.id)
-  };
-};`
-    };
+Important Instructions:
+- Do not mention guard clauses, default parameters, refactoring, or optimizations in the explanation unless they actually exist in the correctedCode.
+- The "diff" lines must list unchanged, removed, and added lines in chronological order to represent the transition from the original code to the correctedCode.
+- Do not include markdown formatting or wrapping around the output. Output ONLY the JSON string.`;
+
+    let responseText = "";
+    try {
+      responseText = await geminiService.generateResponse(prompt, []);
+    } catch (err) {
+      console.warn("Gemini call for debugCode failed, attempting fallback to Groq Llama...", err.message);
+      try {
+        responseText = await groqService.generateGroqResponse(prompt, []);
+      } catch (groqError) {
+        console.error("Groq fallback also failed for debugCode:", groqError.message);
+        throw new Error("AI service temporarily unavailable");
+      }
+    }
+
+    try {
+      let cleaned = responseText.trim();
+      if (cleaned.startsWith("```json")) {
+        cleaned = cleaned.substring(7);
+      } else if (cleaned.startsWith("```")) {
+        cleaned = cleaned.substring(3);
+      }
+      if (cleaned.endsWith("```")) {
+        cleaned = cleaned.substring(0, cleaned.length - 3);
+      }
+      cleaned = cleaned.trim();
+      
+      const parsed = JSON.parse(cleaned);
+      return parsed;
+    } catch (parseError) {
+      console.error("Failed to parse AI JSON response for debugCode:", parseError, responseText);
+      // Return a clean fallback matching the schema
+      return {
+        bugType: "Runtime Error",
+        severity: "High",
+        confidence: 90,
+        confidenceReason: "Fell back to rule-based analysis because the AI output parsing failed.",
+        runtimeError: "TypeError: Cannot read properties of undefined (reading 'map')",
+        rootCause: "A variable evaluates to undefined/null but its properties are read.",
+        correctedCode: code.includes('.map') ? code.replace(/\.map/g, '?.map') : code,
+        diff: [
+          { type: "removed", text: code },
+          { type: "added", text: code.includes('.map') ? code.replace(/\.map/g, '?.map') : code }
+        ],
+        explanation: "Replaced direct property accesses with safe optional chaining operator to prevent runtime crashes.",
+        alternatives: [
+          {
+            title: "Default Initializer",
+            code: "const items = data || [];",
+            pros: "Very clean and highly portable.",
+            cons: "May require extra checks elsewhere.",
+            useCase: "Empty array safety.",
+            recommended: true
+          }
+        ],
+        bestPractices: ["Enable strictNullChecks in tsconfig", "Ensure default value fallbacks"],
+        security: [{ risk: "None", description: "No clear vulnerability detected." }],
+        performance: { timeComplexity: "O(1)", spaceComplexity: "O(1)", complexityChanged: false },
+        qualityScore: { original: 4, corrected: 8, explanation: "Code is crash-safe." }
+      };
+    }
   }
 
   /**

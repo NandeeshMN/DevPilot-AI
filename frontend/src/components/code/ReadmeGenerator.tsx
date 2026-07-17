@@ -3,14 +3,14 @@ import { FileText, Sparkles, Eye, FileCode, Copy, Check } from 'lucide-react';
 import aiService from '../../services/aiService';
 
 export default function ReadmeGenerator() {
-  const [projectName, setProjectName] = useState<string>("DevPilot AI Workspace");
-  const [description, setDescription] = useState<string>("A cybernetic workspace engineered to support modern software development workloads.");
-  const [features, setFeatures] = useState<string>("AI Chat Console, Logic Decoders, Trace Debuggers, Query Matrix Optimizers");
-  const [installation, setInstallation] = useState<string>("npm install && npm run dev");
+  const [projectName, setProjectName] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [features, setFeatures] = useState<string>("");
+  const [installation, setInstallation] = useState<string>("");
   
   const [loading, setLoading] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'preview' | 'raw'>("preview");
-  const [markdown, setMarkdown] = useState<string>("# DevPilot AI Workspace\n\nA cybernetic workspace engineered to support modern software development workloads.\n\n## 🚀 Features\n- AI Chat Console\n- Logic Decoders\n- Trace Debuggers\n- Query Matrix Optimizers\n\n## 🛠️ Installation\n```bash\nnpm install && npm run dev\n```");
+  const [markdown, setMarkdown] = useState<string>("");
   const [copied, setCopied] = useState<boolean>(false);
 
   const handleGenerate = async () => {

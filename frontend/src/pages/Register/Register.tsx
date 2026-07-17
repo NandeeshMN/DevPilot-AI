@@ -14,6 +14,7 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
 
   // Field Errors
@@ -171,7 +172,6 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
             </span>
             <input
               type="text"
-              placeholder="Alex Mercer"
               value={fullName}
               onChange={(e) => {
                 setFullName(e.target.value);
@@ -206,7 +206,6 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
             </span>
             <input
               type="text"
-              placeholder="developer@devpilot.ai"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -241,7 +240,6 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
             </span>
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);
@@ -292,8 +290,7 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
               <Lock size={15} />
             </span>
             <input
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
+              type={showConfirmPassword ? "text" : "password"}
               value={confirmPassword}
               onChange={(e) => {
                 setConfirmPassword(e.target.value);
@@ -305,12 +302,29 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
                 background: '#050811',
                 border: `1px solid ${confirmError ? '#EF4444' : 'rgba(255, 255, 255, 0.08)'}`,
                 borderRadius: '8px',
-                padding: '8px 12px 8px 36px',
+                padding: '8px 38px 8px 36px',
                 fontSize: '13.5px',
                 color: 'var(--color-text-main)',
                 outline: 'none'
               }}
             />
+            <button 
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{ 
+                position: 'absolute', 
+                right: '12px', 
+                top: '50%', 
+                transform: 'translateY(-50%)', 
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--color-text-dark)',
+                cursor: 'pointer',
+                display: 'flex'
+              }}
+            >
+              {showConfirmPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
           </div>
           {confirmError && (
             <span style={{ color: '#EF4444', fontSize: '11px', display: 'block', marginTop: '4px' }}>{confirmError}</span>

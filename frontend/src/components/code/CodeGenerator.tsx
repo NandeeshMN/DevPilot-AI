@@ -3,7 +3,7 @@ import { Code, Terminal, Sparkles, Copy, Download, Check } from 'lucide-react';
 import aiService from '../../services/aiService';
 
 export default function CodeGenerator() {
-  const [prompt, setPrompt] = useState<string>("Create a React modal component that supports closing on Escape key press and outside clicks.");
+  const [prompt, setPrompt] = useState<string>("");
   const [language, setLanguage] = useState<string>("javascript");
   const [framework, setFramework] = useState<string>("react");
   const [loading, setLoading] = useState<boolean>(false);
@@ -94,7 +94,7 @@ export const GeneratedWidget = ({ isOpen, onClose, children }: any) => {
             Prompt / Instructions
           </label>
           <textarea
-            placeholder="Type your coding prompt here..."
+            placeholder="Add your ideas to generate code..."
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             style={{
@@ -113,61 +113,7 @@ export const GeneratedWidget = ({ isOpen, onClose, children }: any) => {
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
-              Target Language
-            </label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              style={{
-                width: '100%',
-                background: '#050811',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                color: 'var(--color-text-main)',
-                fontSize: '13px',
-                padding: '10px 12px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="javascript">JavaScript</option>
-              <option value="typescript">TypeScript</option>
-              <option value="python">Python</option>
-              <option value="sql">SQL</option>
-              <option value="golang">Go</option>
-            </select>
-          </div>
 
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--color-text-muted)', display: 'block', marginBottom: '8px' }}>
-              Framework
-            </label>
-            <select
-              value={framework}
-              onChange={(e) => setFramework(e.target.value)}
-              style={{
-                width: '100%',
-                background: '#050811',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '8px',
-                color: 'var(--color-text-main)',
-                fontSize: '13px',
-                padding: '10px 12px',
-                outline: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <option value="react">React</option>
-              <option value="nextjs">Next.js</option>
-              <option value="vue">Vue</option>
-              <option value="express">Express</option>
-              <option value="none">None (Vanilla)</option>
-            </select>
-          </div>
-        </div>
 
         <button 
           onClick={handleGenerate}

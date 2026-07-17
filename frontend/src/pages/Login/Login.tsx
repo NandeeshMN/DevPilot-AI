@@ -151,7 +151,6 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, onNavigate
             </span>
             <input
               type="text"
-              placeholder="developer@devpilot.ai"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -195,7 +194,6 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, onNavigate
             </span>
             <input
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value);

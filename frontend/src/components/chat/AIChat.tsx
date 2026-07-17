@@ -521,7 +521,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
           </div>
           
           <div style={{ textAlign: 'center', fontSize: '10px', color: 'var(--color-text-dark)', marginTop: '8px' }}>
-            DevPilot AI may produce inaccurate information about people, places, or facts. Cyber-Core v2.4.0
+            DevPilot AI may produce inaccurate information about people, places, or facts.
           </div>
         </div>
       </div>

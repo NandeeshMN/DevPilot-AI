@@ -9,7 +9,7 @@ interface SQLData {
 }
 
 export default function SQLAssistant() {
-  const [nlpQuery, setNlpQuery] = useState<string>("Find the top 10 users with the most posts who have active accounts, including their profile pictures.");
+  const [nlpQuery, setNlpQuery] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   
@@ -67,7 +67,6 @@ export default function SQLAssistant() {
             Describe your Database Query
           </label>
           <textarea
-            placeholder="e.g. 'Get total sales for last month grouped by product category'..."
             value={nlpQuery}
             onChange={(e) => setNlpQuery(e.target.value)}
             style={{
