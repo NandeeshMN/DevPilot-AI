@@ -392,3 +392,97 @@
     display: none;
   }
 }
+
+/* Responsive Landing Page Header & Nav */
+.landing-header {
+  padding: 0 5%;
+}
+
+@media (max-width: 768px) {
+  .landing-nav {
+    display: none !important;
+  }
+  .landing-auth-buttons .btn-secondary {
+    display: none !important;
+  }
+  .landing-auth-buttons {
+    gap: 8px !important;
+  }
+}
+
+/* Responsive Hero Grid */
+.landing-hero {
+  display: grid !important;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 60px;
+  align-items: center;
+  max-width: 1400px;
+  margin: 0 auto;
+  text-align: left;
+  min-height: 85vh;
+}
+
+@media (max-width: 992px) {
+  .landing-hero {
+    grid-template-columns: 1fr !important;
+    text-align: center !important;
+    padding: 120px 5% 60px !important;
+    gap: 40px !important;
+    min-height: auto !important;
+  }
+  .landing-hero h1 {
+    font-size: 38px !important;
+    line-height: 1.1 !important;
+  }
+  .landing-hero h2 {
+    font-size: 20px !important;
+    margin-bottom: 20px !important;
+  }
+  .landing-hero p {
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+    margin-bottom: 28px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  .landing-hero-buttons {
+    justify-content: center !important;
+    gap: 12px !important;
+  }
+  .landing-hero-buttons .btn {
+    padding: 12px 24px !important;
+    font-size: 14px !important;
+  }
+  /* Stacking the illustration on mobile */
+  .landing-hero img {
+    max-height: 280px !important;
+  }
+}
+
+/* Tech Stack Floating Responsiveness & Quotes */
+.landing-quote-section {
+  position: relative;
+  padding: 120px 5%;
+  background: 'radial-gradient(circle at center, #0B1120 0%, #050811 100%)';
+  border-top: '1px solid rgba(255, 255, 255, 0.08)';
+  text-align: 'center';
+  overflow: 'hidden';
+  min-height: '400px';
+  display: 'flex';
+  align-items: 'center';
+  justify-content: 'center';
+}
+
+@media (max-width: 768px) {
+  .tech-item-floating {
+    display: none !important;
+  }
+  .landing-quote-section {
+    padding: 60px 5% !important;
+    min-height: auto !important;
+  }
+  .landing-quote-section blockquote {
+    font-size: 18px !important;
+    line-height: 1.4 !important;
+  }
+}

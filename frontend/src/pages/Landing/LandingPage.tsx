@@ -99,7 +99,7 @@ export default function LandingPage({ onLoginTrigger }: LandingPageProps) {
       <div className="glow-bg glow-pink"></div>
 
       {/* Header */}
-      <header className="glass" style={{
+      <header className="glass landing-header" style={{
         position: 'fixed',
         top: 0,
         left: 0,
@@ -129,12 +129,12 @@ export default function LandingPage({ onLoginTrigger }: LandingPageProps) {
           </span>
         </div>
 
-        <nav style={{ display: 'flex', gap: '24px' }}>
+        <nav className="landing-nav" style={{ display: 'flex', gap: '24px' }}>
           <a href="#features" style={{ color: 'var(--color-text-muted)', textDecoration: 'none', fontSize: '14px', transition: '0.2s' }}>Features</a>
           <a href="#how-it-works" style={{ color: 'var(--color-text-muted)', textDecoration: 'none', fontSize: '14px', transition: '0.2s' }}>How It Works</a>
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="landing-auth-buttons" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button onClick={onLoginTrigger} className="btn btn-secondary" style={{ fontSize: '14px' }}>
             Sign In
           </button>
@@ -145,7 +145,7 @@ export default function LandingPage({ onLoginTrigger }: LandingPageProps) {
       </header>
 
       {/* Hero Section */}
-      <section className="hero-glow-container" style={{ padding: '160px 5% 100px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '60px', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', textAlign: 'left', minHeight: '85vh' }}>
+      <section className="hero-glow-container landing-hero" style={{ padding: '160px 5% 100px', display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '60px', alignItems: 'center', maxWidth: '1400px', margin: '0 auto', textAlign: 'left', minHeight: '85vh' }}>
         <div>
           <div style={{
             display: 'inline-flex',
@@ -172,7 +172,7 @@ export default function LandingPage({ onLoginTrigger }: LandingPageProps) {
             DevPilot AI is an intelligent software engineering assistant designed to help developers generate code, debug applications, explain complex concepts, create documentation, optimize SQL queries, and accelerate development using AI.
           </p>
 
-          <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
+          <div className="landing-hero-buttons" style={{ display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
             <button onClick={onLoginTrigger} className="btn btn-primary" style={{ padding: '14px 32px', fontSize: '16px', gap: '8px' }}>
               Get Started <ArrowRight size={16} />
             </button>
@@ -366,7 +366,7 @@ export default function LandingPage({ onLoginTrigger }: LandingPageProps) {
         }
       `}</style>
 
-      <section style={{ 
+      <section className="landing-quote-section" style={{ 
         position: 'relative', 
         padding: '120px 5%', 
         background: 'radial-gradient(circle at center, #0B1120 0%, #050811 100%)', 
