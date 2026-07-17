@@ -242,7 +242,7 @@ export default function DashboardLayout({ children, activeTab, setActiveTab, onL
       {/* Main Frame Wrapper */}
       <div className="main-wrapper" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
         <main className="content-body" style={{ flexGrow: 1, overflowY: 'auto' }}>
-          {activeTab !== 'chat' && activeTab !== 'dashboard' && (
+          {activeTab !== 'chat' && activeTab !== 'dashboard' && activeTab !== 'settings' && (
             <div 
               className="glass"
               style={{
