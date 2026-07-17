@@ -193,7 +193,7 @@ Optimized for
 
 
 
-< ## 📂 Project Structure
+> ## 📂 Project Structure
 
 ```
 DevPilot-AI
