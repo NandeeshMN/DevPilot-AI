@@ -193,7 +193,7 @@ Optimized for
 
 
 
-# 📂 Project Structure
+< ## 📂 Project Structure
 
 ```
 DevPilot-AI
@@ -242,69 +242,6 @@ cd devpilot-ai
 
 ---
 
-## Backend Setup
-
-```bash
-cd backend
-
-npm install
-```
-
-Create
-
-```
-backend/.env
-```
-
-Add
-
-```env
-PORT=5000
-
-JWT_SECRET=your_jwt_secret
-
-GEMINI_API_KEY=your_gemini_api_key
-
-BREVO_API_KEY=your_brevo_api_key
-
-BREVO_FROM_EMAIL=your_verified_email
-
-BREVO_FROM_NAME=DevPilot AI
-
-FIREBASE_SERVICE_ACCOUNT_PATH=./firebase-service-account.json
-```
-
-Run
-
-```bash
-npm start
-```
-
----
-
-## Frontend Setup
-
-```bash
-cd frontend
-
-npm install
-```
-
-Create
-
-```
-frontend/.env
-```
-
-```env
-VITE_API_BASE_URL=http://localhost:5000/api
-```
-
-Run
-
-```bash
-npm run dev
-```
 
 ---
 
