@@ -206,7 +206,7 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '3fr 1.2fr', gap: '24px' }}>
+    <div className="animate-fade-in dashboard-layout-container">
       {/* Left Column */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
         
@@ -218,14 +218,13 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
           overflow: 'hidden'
         }}>
           <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '3px', background: 'var(--brand-gradient)' }}></div>
-          <div style={{ position: 'absolute', top: '10px', right: '15px', color: 'rgba(255, 255, 255, 0.03)', pointerEvents: 'none' }}>
-            <Cpu size={120} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+            <span style={{ fontSize: '24px' }}>👋</span>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--color-text-main)', letterSpacing: '-0.5px' }}>
+              Welcome back, {user?.email || 'Developer'}
+            </h2>
           </div>
-
-          <h2 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '8px', color: 'var(--color-text-main)' }}>
-            System Online 👋
-          </h2>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', lineHeight: '1.6', maxWidth: '580px', marginBottom: '24px' }}>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: '13.5px', lineHeight: '1.6', maxWidth: '580px', marginBottom: '24px' }}>
             Neural link established. Access artificial intelligence code boards, explain logical complexities, resolve compilation trace errors, and manage software projects.
           </p>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -239,7 +238,7 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
         </div>
 
         {/* Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
+        <div className="metrics-grid">
           <div className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: '600' }}>Active Workspaces</div>
             <div style={{ fontSize: '24px', fontWeight: '800', color: '#06B6D4' }}>{stats.workspaces}</div>

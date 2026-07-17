@@ -36,6 +36,7 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const [inputText, setInputText] = useState<string>("");
   const [provider, setProvider] = useState<string>("gemini");
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [showMobileHistory, setShowMobileHistory] = useState<boolean>(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   // Auto-scroll to bottom of chat
@@ -178,10 +179,10 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '20px', height: 'calc(100vh - 120px)' }}>
+    <div className="animate-fade-in chat-layout-grid">
       
       {/* Left Chat Sidebar (Pinned & Pinned List) */}
-      <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflowY: 'auto' }}>
+      <div className="glass-card chat-history-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px', height: '100%', overflowY: 'auto' }}>
         <button 
           onClick={resetChat}
           className="btn btn-primary" 
@@ -246,6 +247,48 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
       {/* Main Chat Area */}
       <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
         
+        {/* Chat Area Header (Useful for mobile actions) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 20px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          background: '#0D1322',
+          flexShrink: 0
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00F2FE', boxShadow: '0 0 8px #00F2FE' }}></div>
+            <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--color-text-main)' }}>
+              Core Intelligence Link
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              className="mobile-history-toggle"
+              onClick={() => setShowMobileHistory(!showMobileHistory)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.04)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                color: 'var(--color-text-main)',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11.5px',
+                cursor: 'pointer'
+              }}
+            >
+              History
+            </button>
+            <button
+              onClick={resetChat}
+              className="btn btn-primary"
+              style={{ padding: '6px 12px', fontSize: '11.5px', borderRadius: '6px', boxShadow: 'none' }}
+            >
+              New Chat
+            </button>
+          </div>
+        </div>
+
         {/* Messages Stream */}
         <div style={{ flexGrow: 1, padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {messages.map((msg, idx) => (
@@ -481,8 +524,103 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
             DevPilot AI may produce inaccurate information about people, places, or facts. Cyber-Core v2.4.0
           </div>
         </div>
-
       </div>
+
+      {/* Mobile History Drawer overlay */}
+      {showMobileHistory && (
+        <div 
+          className="mobile-history-drawer-overlay" 
+          onClick={() => setShowMobileHistory(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(4, 7, 17, 0.8)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            justifyContent: 'flex-end'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            style={{
+              width: '280px',
+              height: '100%',
+              background: '#080D1A',
+              borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '24px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px',
+              overflowY: 'auto'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '14px', fontWeight: '800', color: 'var(--color-text-main)' }}>Chat History</span>
+              <button 
+                onClick={() => setShowMobileHistory(false)}
+                style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '18px' }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Reuse the chat list content */}
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Pin size={10} /> Pinned Chats
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '6px 0', textAlign: 'center' }}>
+                  No pinned chats.
+                </div>
+              </div>
+
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
+                Recent Chats
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {loadingConvs ? (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
+                    Syncing threads...
+                  </div>
+                ) : conversations.length > 0 ? (
+                  conversations.map((c) => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => {
+                        handleSelectConversation(c.id);
+                        setShowMobileHistory(false);
+                      }}
+                      className="glass" 
+                      style={{ 
+                        padding: '8px 12px', 
+                        borderRadius: '6px', 
+                        fontSize: '12px', 
+                        cursor: 'pointer', 
+                        color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '8px',
+                        borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none'
+                      }}
+                    >
+                      <MessageSquare size={12} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.title || "AI Assistant Chat"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ fontSize: '11px', color: 'var(--color-text-dark)', padding: '10px 0', textAlign: 'center' }}>
+                    No conversations yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
