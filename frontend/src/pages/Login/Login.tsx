@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Terminal, Lock, Mail, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
-
+import authService from '../../services/authService';
 import { User } from '../context/AuthContext';
 
 interface LoginProps {
@@ -49,7 +49,7 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, onNavigate
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
@@ -60,24 +60,15 @@ export default function Login({ onLoginSuccess, onNavigateToRegister, onNavigate
 
     setLoading(true);
 
-    fetch('http://localhost:5000/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase(), password })
-    })
-    .then(async (res) => {
+    try {
+      const data = await authService.login(email.toLowerCase(), password);
       setLoading(false);
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || "An error occurred during authentication.");
-      } else {
-        onLoginSuccess(data.user, data.token);
-      }
-    })
-    .catch(() => {
+      onLoginSuccess(data.user, data.token);
+    } catch (err: any) {
       setLoading(false);
-      setFormError("Unable to connect to the authentication server.");
-    });
+      const errorMsg = err.response?.data?.error || "Unable to connect to the authentication server.";
+      setFormError(errorMsg);
+    }
   };
 
   /* 

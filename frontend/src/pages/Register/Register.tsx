@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Terminal, Lock, Mail, User, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
+import authService from '../../services/authService';
 
 interface RegisterProps {
   onRegisterSuccess: () => void;
@@ -75,7 +76,7 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
@@ -88,24 +89,15 @@ export default function Register({ onRegisterSuccess, onNavigateToLogin, onBackT
 
     setLoading(true);
 
-    fetch('http://localhost:5000/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fullName, email: email.toLowerCase(), password })
-    })
-    .then(async (res) => {
+    try {
+      await authService.register(fullName, email.toLowerCase(), password);
       setLoading(false);
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || "An error occurred during registration.");
-      } else {
-        onRegisterSuccess();
-      }
-    })
-    .catch(() => {
+      onRegisterSuccess();
+    } catch (err: any) {
       setLoading(false);
-      setFormError("Unable to connect to the registration server.");
-    });
+      const errorMsg = err.response?.data?.error || "Unable to connect to the registration server.";
+      setFormError(errorMsg);
+    }
   };
 
   return (

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Terminal, Lock, Mail, Key, Eye, EyeOff, Loader2, ArrowRight, CheckCircle2 } from 'lucide-react';
+import authService from '../../services/authService';
 
 interface ForgotPasswordProps {
   onResetSuccess: () => void;
@@ -38,34 +39,25 @@ export default function ForgotPassword({ onResetSuccess, onBackToLogin }: Forgot
     return true;
   };
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     if (!validateEmail(email)) return;
 
     setLoading(true);
     
-    fetch('http://localhost:5000/api/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase() })
-    })
-    .then(async (res) => {
+    try {
+      await authService.forgotPassword(email.toLowerCase());
       setLoading(false);
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || "An error occurred while sending OTP.");
-      } else {
-        setStep('otp');
-      }
-    })
-    .catch(() => {
+      setStep('otp');
+    } catch (err: any) {
       setLoading(false);
-      setFormError("Unable to connect to the reset service.");
-    });
+      const errorMsg = err.response?.data?.error || "Unable to connect to the reset service.";
+      setFormError(errorMsg);
+    }
   };
 
-  const handleVerifyOtp = (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     if (!otp) {
@@ -79,24 +71,15 @@ export default function ForgotPassword({ onResetSuccess, onBackToLogin }: Forgot
     setOtpError("");
     setLoading(true);
 
-    fetch('http://localhost:5000/api/auth/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase(), otp })
-    })
-    .then(async (res) => {
+    try {
+      await authService.verifyOtp(email.toLowerCase(), otp);
       setLoading(false);
-      const data = await res.json();
-      if (!res.ok) {
-        setOtpError(data.error || "Invalid OTP code.");
-      } else {
-        setStep('password');
-      }
-    })
-    .catch(() => {
+      setStep('password');
+    } catch (err: any) {
       setLoading(false);
-      setFormError("Unable to connect to the verification service.");
-    });
+      const errorMsg = err.response?.data?.error || "Invalid OTP code.";
+      setOtpError(errorMsg);
+    }
   };
 
   const validatePassword = (val: string) => {
@@ -125,7 +108,7 @@ export default function ForgotPassword({ onResetSuccess, onBackToLogin }: Forgot
     return true;
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
 
@@ -136,24 +119,15 @@ export default function ForgotPassword({ onResetSuccess, onBackToLogin }: Forgot
 
     setLoading(true);
     
-    fetch('http://localhost:5000/api/auth/reset-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.toLowerCase(), otp, newPassword })
-    })
-    .then(async (res) => {
+    try {
+      await authService.resetPassword(email.toLowerCase(), otp, newPassword);
       setLoading(false);
-      const data = await res.json();
-      if (!res.ok) {
-        setFormError(data.error || "Failed to update password.");
-      } else {
-        setStep('success');
-      }
-    })
-    .catch(() => {
+      setStep('success');
+    } catch (err: any) {
       setLoading(false);
-      setFormError("Unable to connect to the reset service.");
-    });
+      const errorMsg = err.response?.data?.error || "Failed to update password.";
+      setFormError(errorMsg);
+    }
   };
 
   return (
