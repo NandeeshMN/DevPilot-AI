@@ -880,136 +880,187 @@ function ConversationItem({ c, conversationId, openMenuId, setOpenMenuId, handle
 }
 
 /**
+ * Renders a fenced code block with language badge and copy button.
+ */
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = React.useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div style={{ borderRadius: '10px', overflow: 'hidden', margin: '10px 0', border: '1px solid rgba(255,255,255,0.1)' }}>
+      {/* Header bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#0D1322', padding: '7px 14px',
+        borderBottom: '1px solid rgba(255,255,255,0.08)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#FF5F57', display: 'inline-block' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#FFBD2E', display: 'inline-block' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#28CA41', display: 'inline-block' }} />
+          <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: 'var(--font-mono)', textTransform: 'lowercase' }}>
+            {lang}
+          </span>
+        </div>
+        <button
+          onClick={copy}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: copied ? '#10B981' : 'var(--color-text-muted)',
+            fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px',
+            transition: 'color 0.2s ease'
+          }}
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? 'Copied!' : 'Copy'}
+        </button>
+      </div>
+      {/* Code body */}
+      <div style={{ background: '#080D1A', padding: '14px 16px', overflowX: 'auto' }}>
+        <pre style={{
+          margin: 0, fontFamily: 'var(--font-mono)', fontSize: '12.5px',
+          color: '#E5E7EB', lineHeight: '1.7', whiteSpace: 'pre'
+        }}>
+          {code}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Custom lightweight helper parsing raw AI text to justified paragraphs, bullet points and bold lines.
  */
 const renderMarkdown = (text: string) => {
   if (!text) return null;
 
-  // Split text by lines
-  const paragraphs = text.split('\n');
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  let copiedBlockIdx: number | null = null;
 
-  return paragraphs.map((line, lineIdx) => {
-    const trimmedLine = line.trim();
-    if (!trimmedLine) {
-      return <div key={lineIdx} style={{ height: '8px' }} />;
-    }
+  while (i < lines.length) {
+    const line = lines[i];
+    const trimmed = line.trim();
 
-    // Headers
-    if (trimmedLine.startsWith('### ')) {
-      return (
-        <h4 key={lineIdx} style={{ fontSize: '15px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '12px', marginBottom: '8px' }}>
-          {parseInlineMarkdown(trimmedLine.substring(4))}
-        </h4>
+    // ── Fenced code block ────────────────────────────────────────────────────
+    if (trimmed.startsWith('```')) {
+      const lang = trimmed.slice(3).trim() || 'code';
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing ```
+      const code = codeLines.join('\n');
+      const blockIdx = elements.length;
+
+      elements.push(
+        <CodeBlock key={blockIdx} lang={lang} code={code} />
       );
-    }
-    if (trimmedLine.startsWith('## ')) {
-      return (
-        <h3 key={lineIdx} style={{ fontSize: '17px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '16px', marginBottom: '10px' }}>
-          {parseInlineMarkdown(trimmedLine.substring(3))}
-        </h3>
-      );
-    }
-    if (trimmedLine.startsWith('# ')) {
-      return (
-        <h2 key={lineIdx} style={{ fontSize: '19px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '20px', marginBottom: '12px' }}>
-          {parseInlineMarkdown(trimmedLine.substring(2))}
-        </h2>
-      );
+      continue;
     }
 
-    // Blockquotes
-    if (trimmedLine.startsWith('> ')) {
-      return (
-        <blockquote key={lineIdx} style={{ borderLeft: '3px solid #8B5CF6', paddingLeft: '12px', marginLeft: '0', color: 'var(--color-text-muted)', fontStyle: 'italic', margin: '8px 0' }}>
-          {parseInlineMarkdown(trimmedLine.substring(2))}
+    // ── Empty line ────────────────────────────────────────────────────────────
+    if (!trimmed) {
+      elements.push(<div key={i} style={{ height: '6px' }} />);
+      i++; continue;
+    }
+
+    // ── Horizontal rule ───────────────────────────────────────────────────────
+    if (/^(-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      elements.push(<hr key={i} style={{ border: 'none', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />);
+      i++; continue;
+    }
+
+    // ── Headers ───────────────────────────────────────────────────────────────
+    if (trimmed.startsWith('### ')) {
+      elements.push(<h4 key={i} style={{ fontSize: '15px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '12px', marginBottom: '6px' }}>{parseInlineMarkdown(trimmed.slice(4))}</h4>);
+      i++; continue;
+    }
+    if (trimmed.startsWith('## ')) {
+      elements.push(<h3 key={i} style={{ fontSize: '17px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '16px', marginBottom: '8px' }}>{parseInlineMarkdown(trimmed.slice(3))}</h3>);
+      i++; continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      elements.push(<h2 key={i} style={{ fontSize: '19px', fontWeight: '800', color: 'var(--color-text-main)', marginTop: '20px', marginBottom: '10px' }}>{parseInlineMarkdown(trimmed.slice(2))}</h2>);
+      i++; continue;
+    }
+
+    // ── Blockquote ────────────────────────────────────────────────────────────
+    if (trimmed.startsWith('> ')) {
+      elements.push(
+        <blockquote key={i} style={{ borderLeft: '3px solid #8B5CF6', paddingLeft: '12px', marginLeft: 0, color: 'var(--color-text-muted)', fontStyle: 'italic', margin: '8px 0' }}>
+          {parseInlineMarkdown(trimmed.slice(2))}
         </blockquote>
       );
+      i++; continue;
     }
 
-    // Checkbox task list items: - [ ] or - [x] or - [~]
-    if (trimmedLine.startsWith('- [ ] ') || trimmedLine.startsWith('* [ ] ')) {
-      return (
-        <div key={lineIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0', paddingLeft: '8px' }}>
-          <span style={{
-            width: '14px',
-            height: '14px',
-            borderRadius: '3px',
-            border: '1.5px solid var(--color-text-dark)',
-            display: 'inline-block',
-            flexShrink: 0
-          }} />
-          <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>
-            {parseInlineMarkdown(trimmedLine.substring(6))}
-          </span>
+    // ── Task list items ───────────────────────────────────────────────────────
+    if (trimmed.startsWith('- [ ] ') || trimmed.startsWith('* [ ] ')) {
+      elements.push(
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', paddingLeft: '8px' }}>
+          <span style={{ width: '14px', height: '14px', borderRadius: '3px', border: '1.5px solid var(--color-text-dark)', display: 'inline-block', flexShrink: 0 }} />
+          <span style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>{parseInlineMarkdown(trimmed.slice(6))}</span>
         </div>
       );
+      i++; continue;
     }
-
-    if (trimmedLine.startsWith('- [x] ') || trimmedLine.startsWith('* [x] ') || trimmedLine.startsWith('- [~] ') || trimmedLine.startsWith('* [~] ')) {
-      const isProgress = trimmedLine.includes('[~]');
-      return (
-        <div key={lineIdx} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '6px 0', paddingLeft: '8px' }}>
-          <span style={{
-            width: '14px',
-            height: '14px',
-            borderRadius: '3px',
-            border: isProgress ? '1.5px solid var(--color-primary-accent)' : '1.5px solid #10B981',
-            background: isProgress ? 'rgba(79, 140, 255, 0.2)' : 'rgba(16, 185, 129, 0.2)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '9px',
-            fontWeight: 'bold',
-            color: isProgress ? 'var(--color-primary-accent)' : '#10B981',
-            flexShrink: 0
-          }}>
+    if (/^[-*] \[[x~]\] /.test(trimmed)) {
+      const isProgress = trimmed.includes('[~]');
+      elements.push(
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '4px 0', paddingLeft: '8px' }}>
+          <span style={{ width: '14px', height: '14px', borderRadius: '3px', border: `1.5px solid ${isProgress ? '#4F8CFF' : '#10B981'}`, background: isProgress ? 'rgba(79,140,255,0.2)' : 'rgba(16,185,129,0.2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 'bold', color: isProgress ? '#4F8CFF' : '#10B981', flexShrink: 0 }}>
             {isProgress ? '~' : '✓'}
           </span>
-          <span style={{ 
-            color: isProgress ? 'var(--color-text-muted)' : 'var(--color-text-dark)', 
-            textDecoration: isProgress ? 'none' : 'line-through',
-            fontSize: '13px' 
-          }}>
-            {parseInlineMarkdown(trimmedLine.substring(6))}
+          <span style={{ color: isProgress ? 'var(--color-text-muted)' : 'var(--color-text-dark)', textDecoration: isProgress ? 'none' : 'line-through', fontSize: '13px' }}>
+            {parseInlineMarkdown(trimmed.slice(6))}
           </span>
         </div>
       );
+      i++; continue;
     }
 
-    // Unordered lists
-    if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
-      return (
-        <ul key={lineIdx} style={{ margin: '4px 0', paddingLeft: '20px', listStyleType: 'disc' }}>
-          <li style={{ color: 'var(--color-text-muted)' }}>
-            {parseInlineMarkdown(trimmedLine.substring(2))}
-          </li>
-        </ul>
+    // ── Unordered list ────────────────────────────────────────────────────────
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      elements.push(
+        <div key={i} style={{ display: 'flex', gap: '8px', margin: '3px 0', paddingLeft: '8px' }}>
+          <span style={{ color: '#4F8CFF', flexShrink: 0, marginTop: '1px' }}>•</span>
+          <span style={{ color: 'var(--color-text-muted)', lineHeight: '1.6' }}>{parseInlineMarkdown(trimmed.slice(2))}</span>
+        </div>
       );
+      i++; continue;
     }
 
-    // Ordered lists
-    const orderedListRegex = /^(\d+)\.\s(.*)/;
-    if (orderedListRegex.test(trimmedLine)) {
-      const match = trimmedLine.match(orderedListRegex);
-      if (match) {
-        return (
-          <ol key={lineIdx} style={{ margin: '4px 0', paddingLeft: '20px', listStyleType: 'decimal' }}>
-            <li style={{ color: 'var(--color-text-muted)' }}>
-              {parseInlineMarkdown(match[2])}
-            </li>
-          </ol>
-        );
-      }
+    // ── Ordered list ──────────────────────────────────────────────────────────
+    const olMatch = trimmed.match(/^(\d+)\.\s(.*)/);
+    if (olMatch) {
+      elements.push(
+        <div key={i} style={{ display: 'flex', gap: '8px', margin: '3px 0', paddingLeft: '8px' }}>
+          <span style={{ color: '#4F8CFF', flexShrink: 0, minWidth: '18px' }}>{olMatch[1]}.</span>
+          <span style={{ color: 'var(--color-text-muted)', lineHeight: '1.6' }}>{parseInlineMarkdown(olMatch[2])}</span>
+        </div>
+      );
+      i++; continue;
     }
 
-    // Default justified paragraph
-    return (
-      <p key={lineIdx} style={{ margin: '6px 0', color: 'var(--color-text-muted)', lineHeight: '1.6', textAlign: 'justify' }}>
+    // ── Default paragraph ─────────────────────────────────────────────────────
+    elements.push(
+      <p key={i} style={{ margin: '5px 0', color: 'var(--color-text-muted)', lineHeight: '1.65', textAlign: 'justify' }}>
         {parseInlineMarkdown(line)}
       </p>
     );
-  });
+    i++;
+  }
+
+  return <>{elements}</>;
 };
+
 
 /**
  * Custom inline parsing utility supporting bold strings, italic segments, and inline monospace code blocks.
