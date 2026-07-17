@@ -13,6 +13,7 @@ import {
 import { useAuthContext } from '../../context/AuthContext';
 import { db } from '../../firebase/firebase';
 import { collection, getDocs } from 'firebase/firestore';
+import api from '../../services/api';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -43,10 +44,9 @@ export default function Dashboard({ setActiveTab, setPreloadedPrompt }: Dashboar
 
   // Fetch AI Tip of the Day from Express backend
   useEffect(() => {
-    fetch('http://localhost:5000/api/tip')
-      .then(res => res.json())
-      .then(data => {
-        if (data.tip) setTip(data.tip);
+    api.get<{ tip: string }>('/tip')
+      .then(res => {
+        if (res.data.tip) setTip(res.data.tip);
       })
       .catch(() => console.log("Backend offline: using default static tip."));
   }, []);
