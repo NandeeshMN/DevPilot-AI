@@ -226,6 +226,110 @@ const chat = async (req, res, next) => {
   }
 };
 
+/**
+ * Retrieves all conversations for the authenticated user.
+ */
+const getConversations = async (req, res, next) => {
+  try {
+    const userId = req.user.id.toLowerCase();
+    const chatsSnapshot = await db.collection('chats')
+      .where('userId', '==', userId)
+      .get();
+
+    const list = [];
+    chatsSnapshot.forEach(doc => {
+      list.push({ id: doc.id, ...doc.data() });
+    });
+
+    // Sort by updatedAt desc
+    list.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+    return res.json({ success: true, conversations: list });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Retrieves all messages of a specific conversation.
+ */
+const getConversationMessages = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id.toLowerCase();
+
+    const chatDocRef = db.collection('chats').doc(conversationId);
+    const chatDocSnap = await chatDocRef.get();
+
+    if (!chatDocSnap.exists) {
+      return sendError(res, "Conversation not found", 404);
+    }
+
+    const chatData = chatDocSnap.data();
+    if (chatData.userId !== userId) {
+      return sendError(res, "Unauthorized access to conversation", 403);
+    }
+
+    const messagesSnapshot = await chatDocRef
+      .collection('messages')
+      .orderBy('timestamp', 'asc')
+      .get();
+
+    const messages = messagesSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        role: data.role,
+        content: data.content,
+        timestamp: data.timestamp ? data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+    });
+
+    return res.json({ success: true, messages });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Deletes a conversation and all its messages.
+ */
+const deleteConversation = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user.id.toLowerCase();
+
+    const chatDocRef = db.collection('chats').doc(conversationId);
+    const chatDocSnap = await chatDocRef.get();
+
+    if (!chatDocSnap.exists) {
+      return sendError(res, "Conversation not found", 404);
+    }
+
+    const chatData = chatDocSnap.data();
+    if (chatData.userId !== userId) {
+      return sendError(res, "Unauthorized access to conversation", 403);
+    }
+
+    // Delete subcollection messages in batch
+    const messagesSnapshot = await chatDocRef.collection('messages').get();
+    if (!messagesSnapshot.empty) {
+      const batch = db.batch();
+      messagesSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+    }
+
+    // Delete the parent document
+    await chatDocRef.delete();
+
+    return res.json({ success: true, message: "Conversation deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   explainCode,
   debugCode,
@@ -233,5 +337,8 @@ module.exports = {
   sqlAssistant,
   readmeGenerator,
   getTip,
-  chat
+  chat,
+  getConversations,
+  getConversationMessages,
+  deleteConversation
 };

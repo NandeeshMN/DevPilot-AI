@@ -53,7 +53,7 @@ export default function SQLAssistant() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px' }}>
+    <div className="animate-fade-in responsive-grid-main">
       
       {/* Left Column: Natural Language Input */}
       <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px', height: 'fit-content' }}>

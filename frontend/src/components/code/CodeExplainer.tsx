@@ -58,7 +58,7 @@ export default function CodeExplainer() {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px' }}>
+    <div className="animate-fade-in responsive-grid-main-reverse">
       
       {/* Left Column: Monaco Code Editor */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -121,7 +121,7 @@ export default function CodeExplainer() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         
         {/* Complexity Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+        <div className="responsive-grid-half">
           
           <div className="glass-card" style={{
             padding: '20px', 

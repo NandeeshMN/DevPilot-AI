@@ -8,12 +8,12 @@ import {
   MessageSquare, 
   Copy, 
   Check, 
-  Bot 
+  Bot,
+  Trash
 } from 'lucide-react';
 import useChat from '../../hooks/useChat';
 import { useAuthContext } from '../../context/AuthContext';
-import { db } from '../../firebase/firebase';
-import { collection, getDocs, doc, getDoc, query, orderBy } from 'firebase/firestore';
+import aiService from '../../services/aiService';
 
 interface AIChatProps {
   preloadedPrompt: string;
@@ -51,42 +51,14 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   // Fetch user conversations on load and update on message changes
   useEffect(() => {
     if (!user?.email) return;
-    const email = user.email.toLowerCase();
 
     const fetchConversationsList = async () => {
       try {
         setLoadingConvs(true);
-        const listMap = new Map<string, any>();
-
-        // 1. Fetch conversations from new 'chats' collection group
-        try {
-          const chatsRef = collection(db, 'chats');
-          const qChats = query(chatsRef, where('userId', '==', email));
-          const snapChats = await getDocs(qChats);
-          snapChats.forEach(d => {
-            listMap.set(d.id, { id: d.id, ...d.data() });
-          });
-        } catch (errChats) {
-          console.warn("Failed fetching from new chats collection:", errChats);
+        const res = await aiService.getConversations();
+        if (res && res.conversations) {
+          setConversations(res.conversations);
         }
-
-        // 2. Fetch conversations from old fallback collection path
-        try {
-          const oldRef = collection(db, 'users', email, 'conversations');
-          const snapOld = await getDocs(oldRef);
-          snapOld.forEach(d => {
-            if (!listMap.has(d.id)) {
-              listMap.set(d.id, { id: d.id, ...d.data() });
-            }
-          });
-        } catch (errOld) {
-          console.warn("Failed fetching from fallback conversations collection:", errOld);
-        }
-
-        const list = Array.from(listMap.values());
-        // Sort chronologically desc
-        list.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
-        setConversations(list);
       } catch (err) {
         console.error("Error fetching conversations list:", err);
       } finally {
@@ -101,48 +73,33 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
   const handleSelectConversation = async (convId: string) => {
     if (!user?.email || loading) return;
     try {
-      const email = user.email.toLowerCase();
-      
-      // 1. Try to fetch messages from subcollection chats/{convId}/messages
-      const msgsRef = collection(db, 'chats', convId, 'messages');
-      const q = query(msgsRef, orderBy('timestamp', 'asc'));
-      const snapMsgs = await getDocs(q);
-
-      if (!snapMsgs.empty) {
-        const mapped = snapMsgs.docs.map(doc => {
-          const data = doc.data();
-          return {
-            sender: data.role === 'assistant' ? 'assistant' : 'user',
-            text: data.content,
-            timestamp: data.timestamp?.toDate 
-              ? data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-        });
+      const res = await aiService.getConversationMessages(convId);
+      if (res && res.messages) {
+        const mapped = res.messages.map((m: any) => ({
+          sender: m.role === 'assistant' ? 'assistant' : 'user',
+          text: m.content,
+          timestamp: m.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }));
         setMessages(mapped);
         setConversationId(convId);
-      } else {
-        // 2. Fallback to old path users/{email}/conversations/{convId}
-        const docRef = doc(db, 'users', email, 'conversations', convId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const firestoreMessages = data.messages || [];
-          
-          const mapped = firestoreMessages.map((m: any) => ({
-            sender: m.role === 'model' || m.role === 'assistant' ? 'assistant' : 'user',
-            text: m.content,
-            timestamp: m.timestamp?.toDate 
-              ? m.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-              : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          }));
-          
-          setMessages(mapped);
-          setConversationId(convId);
-        }
       }
     } catch (err) {
       console.error("Error loading conversation:", err);
+    }
+  };
+
+  // Delete a historical conversation chat thread
+  const handleDeleteConversation = async (e: React.MouseEvent, convId: string) => {
+    e.stopPropagation(); // Prevent selection
+    if (!window.confirm("Are you sure you want to delete this chat thread?")) return;
+    try {
+      await aiService.deleteConversation(convId);
+      setConversations(prev => prev.filter(c => c.id !== convId));
+      if (conversationId === convId) {
+        resetChat();
+      }
+    } catch (err) {
+      console.error("Error deleting conversation:", err);
     }
   };
 
@@ -225,14 +182,36 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                     color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
                     display: 'flex', 
                     alignItems: 'center', 
+                    justifyContent: 'space-between',
                     gap: '8px',
-                    borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none'
+                    borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none',
+                    transition: 'all 0.15s ease'
                   }}
                 >
-                  <MessageSquare size={12} />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {c.title || "AI Assistant Chat"}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
+                    <MessageSquare size={12} style={{ flexShrink: 0 }} />
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.title || "AI Assistant Chat"}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteConversation(e, c.id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'rgba(239, 68, 68, 0.7)',
+                      cursor: 'pointer',
+                      padding: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      borderRadius: '4px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.7)'}
+                  >
+                    <Trash size={12} />
+                  </button>
                 </div>
               ))
             ) : (
@@ -601,14 +580,36 @@ export default function AIChat({ preloadedPrompt, clearPreloadedPrompt }: AIChat
                         color: conversationId === c.id ? '#00F2FE' : 'var(--color-text-muted)', 
                         display: 'flex', 
                         alignItems: 'center', 
+                        justifyContent: 'space-between',
                         gap: '8px',
-                        borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none'
+                        borderLeft: conversationId === c.id ? '2px solid #00F2FE' : 'none',
+                        transition: 'all 0.15s ease'
                       }}
                     >
-                      <MessageSquare size={12} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.title || "AI Assistant Chat"}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flexGrow: 1 }}>
+                        <MessageSquare size={12} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {c.title || "AI Assistant Chat"}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteConversation(e, c.id)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'rgba(239, 68, 68, 0.7)',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          borderRadius: '4px',
+                          transition: 'all 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#EF4444'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(239, 68, 68, 0.7)'}
+                      >
+                        <Trash size={12} />
+                      </button>
                     </div>
                   ))
                 ) : (

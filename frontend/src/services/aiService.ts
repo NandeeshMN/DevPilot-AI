@@ -53,6 +53,21 @@ class AIService {
     const response = await api.get<TipResponse>('/tip');
     return response.data;
   }
+
+  async getConversations(): Promise<any> {
+    const response = await api.get('/ai/conversations');
+    return response.data;
+  }
+
+  async getConversationMessages(conversationId: string): Promise<any> {
+    const response = await api.get(`/ai/conversations/${conversationId}`);
+    return response.data;
+  }
+
+  async deleteConversation(conversationId: string): Promise<any> {
+    const response = await api.delete(`/ai/conversations/${conversationId}`);
+    return response.data;
+  }
 }
 
 export const aiService = new AIService();

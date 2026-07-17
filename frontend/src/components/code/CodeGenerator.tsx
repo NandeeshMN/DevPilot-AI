@@ -84,7 +84,7 @@ export const GeneratedWidget = ({ isOpen, onClose, children }: any) => {
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px' }}>
+    <div className="animate-fade-in responsive-grid-main">
       
       {/* Left Column: Form Controls */}
       <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', height: 'fit-content' }}>

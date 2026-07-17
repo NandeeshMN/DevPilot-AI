@@ -213,7 +213,7 @@ ${fixResult.bestPractices?.map(bp => `- ${bp}`).join('\n') || 'None'}
   };
 
   return (
-    <div className="animate-fade-in" style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '24px' }}>
+    <div className="animate-fade-in responsive-grid-main">
       
       {/* Left Column: Diagnostics Inputs */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -538,7 +538,7 @@ ${fixResult.bestPractices?.map(bp => `- ${bp}`).join('\n') || 'None'}
                         {alt.code}
                       </pre>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '11.5px' }}>
+                      <div className="responsive-grid-half" style={{ gap: '10px', fontSize: '11.5px' }}>
                         <div>
                           <span style={{ color: '#34D399', fontWeight: 'bold', display: 'block', marginBottom: '2px' }}>Pros:</span>
                           <span style={{ color: 'var(--color-text-muted)' }}>{alt.pros}</span>
@@ -560,7 +560,7 @@ ${fixResult.bestPractices?.map(bp => `- ${bp}`).join('\n') || 'None'}
 
             {/* Step 13 & 14: Performance & Security Audits */}
             <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              <div className="responsive-grid-half-large">
                 
                 {/* Performance */}
                 {fixResult.performance && (
@@ -638,7 +638,7 @@ ${fixResult.bestPractices?.map(bp => `- ${bp}`).join('\n') || 'None'}
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '12px' }}>
+                <div className="responsive-grid-half-large" style={{ marginBottom: '12px' }}>
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px', color: 'var(--color-text-muted)' }}>
                       <span>Original Score</span>
